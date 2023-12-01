@@ -10,8 +10,8 @@ jobs:
   docker:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.1.1
       - uses: schubergphilis.com/docker-action@v0.1.0
         with:
-          image: image/tag:${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 ```

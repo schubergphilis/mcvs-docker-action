@@ -1,7 +1,9 @@
 ---
+name: test
+description: test
 inputs:
-  image:
-    description: image
+  token:
+    description: test
     required: true
 runs:
   using: "composite"
@@ -11,7 +13,7 @@ runs:
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ inputs.token }}
     - name: Extract metadata (tags, labels) for Docker
       id: meta
       uses: docker/metadata-action@v5.0.0
