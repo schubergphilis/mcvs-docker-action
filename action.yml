@@ -1,0 +1,83 @@
+---
+name: mcaf-mcvs-docker-action
+description: |
+  The Mission Critical Acceleration Framework (MCAF)
+  Mission Critical Vulnerability Scanner (MCVS) Docker action.
+inputs:
+  dockle-accept-key:
+    description: |
+      One of the Dockle checks is the inspection of use of secrets in
+      environment variables. Currently, there is a reported bug
+      `goodwithtech/dockle/issues/250`, i.e. if a specific version of a package
+      will be installed then an error will be thrown by Dockle, which is
+      incorrect. To mitigate this one has to specify the packages that are
+      applicable, e.g.: `libcrypto3,libssl3`.
+  token:
+    description: |
+      A token is required to allow the mcaf-mcvs-docker-action to push the
+      image that it has been built, to the packages repository of the GitHub
+      repository where the action has been run.
+    required: true
+runs:
+  using: "composite"
+  steps:
+    #
+    # dockerfile linting (static)
+    #
+    - uses: hadolint/hadolint-action@v1.6.0
+      with:
+        dockerfile: Dockerfile
+    #
+    # determine image name and tag
+    #
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@v5.0.0
+      with:
+        images: ghcr.io/${{ github.repository }}
+    - name: Build an image from Dockerfile
+      shell: bash
+      run: |
+        docker build -t ${{ steps.meta.outputs.tags }} .
+    #
+    # docker image linting (dynamic)
+    #
+    - uses: goodwithtech/dockle-action@v0.1.2
+      with:
+        image: ${{ steps.meta.outputs.tags }}
+        ignore: CIS-DI-0005,CIS-DI-0006
+        accept-key: ${{ inputs.dockle-accept-key }}
+    #
+    # code and docker image security scanning
+    #
+    - uses: aquasecurity/trivy-action@0.14.0
+      with:
+        scan-type: "fs"
+        scan-ref: "."
+        exit-code: "1"
+        ignore-unfixed: true
+        severity: "CRITICAL,HIGH"
+    - uses: aquasecurity/trivy-action@0.14.0
+      with:
+        image-ref: ${{ steps.meta.outputs.tags }}
+        format: "table"
+        exit-code: "1"
+        ignore-unfixed: true
+        vuln-type: "os,library"
+        severity: "CRITICAL,HIGH"
+    #
+    # log in to GH registry and push the the image
+    #
+    - name: Log in to the Container registry
+      uses: docker/login-action@v3.0.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5.1.0
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
