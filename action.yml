@@ -1,7 +1,17 @@
 ---
 name: mcaf-mcvs-docker-action
-description: mcaf-mcvs-docker-action
+description: |
+  The Mission Critical Acceleration Framework (MCAF)
+  Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
+  dockle-accept-key:
+    description: |
+      One of the Dockle checks is the inspection of use of secrets in
+      environment variables. Currently, there is a reported bug
+      `goodwithtech/dockle/issues/250`, i.e. if a specific version of a package
+      will be installed then an error will be thrown by Dockle, which is
+      incorrect. To mitigate this one has to specify the packages that are
+      applicable, e.g.: `libcrypto3,libssl3`.
   token:
     description: |
       A token is required to allow the mcaf-mcvs-docker-action to push the
@@ -11,9 +21,15 @@ inputs:
 runs:
   using: "composite"
   steps:
+    #
+    # dockerfile linting (static)
+    #
     - uses: hadolint/hadolint-action@v1.6.0
       with:
         dockerfile: Dockerfile
+    #
+    # determine image name and tag
+    #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
       uses: docker/metadata-action@v5.0.0
@@ -23,6 +39,17 @@ runs:
       shell: bash
       run: |
         docker build -t ${{ steps.meta.outputs.tags }} .
+    #
+    # docker image linting (dynamic)
+    #
+    - uses: goodwithtech/dockle-action@v0.1.2
+      with:
+        image: ${{ steps.meta.outputs.tags }}
+        ignore: CIS-DI-0005,CIS-DI-0006
+        accept-key: ${{ inputs.dockle-accept-key }}
+    #
+    # code and docker image security scanning
+    #
     - uses: aquasecurity/trivy-action@0.14.0
       with:
         scan-type: "fs"
@@ -38,6 +65,9 @@ runs:
         ignore-unfixed: true
         vuln-type: "os,library"
         severity: "CRITICAL,HIGH"
+    #
+    # log in to GH registry and push the the image
+    #
     - name: Log in to the Container registry
       uses: docker/login-action@v3.0.0
       with:

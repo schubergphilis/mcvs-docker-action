@@ -13,5 +13,6 @@ jobs:
       - uses: actions/checkout@v4.1.1
       - uses: schubergphilis/mcaf-mcvs-docker-action@v0.1.0
         with:
+          dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
