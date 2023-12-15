@@ -34,11 +34,16 @@ runs:
       id: meta
       uses: docker/metadata-action@v5.0.0
       with:
+        flavor: |
+          latest=false
         images: ghcr.io/${{ github.repository }}
-    - name: Build an image from Dockerfile
-      shell: bash
-      run: |
-        docker build -t ${{ steps.meta.outputs.tags }} .
+    - name: Build an image from a dockerfile
+      uses: docker/build-push-action@v5.1.0
+      with:
+        context: .
+        push: false
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
     #
     # docker image linting (dynamic)
     #
@@ -75,6 +80,7 @@ runs:
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Build and push Docker image
+      if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
       uses: docker/build-push-action@v5.1.0
       with:
         context: .
