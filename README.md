@@ -7,7 +7,7 @@ Create a `.github/workflows/docker.yml` file with the following content:
 name: Docker
 "on": push
 jobs:
-  docker:
+  mcaf-mcvs-docker-action:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4.1.1
