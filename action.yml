@@ -19,7 +19,7 @@ inputs:
       repository where the action has been run.
     required: true
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     #
     # dockerfile linting (static)
@@ -37,6 +37,9 @@ runs:
         flavor: |
           latest=false
         images: ghcr.io/${{ github.repository }}
+    #
+    # build a docker image
+    #
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v5.1.0
       with:
@@ -53,23 +56,29 @@ runs:
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
     #
+    # detect waste in the docker image
+    #
+    - uses: 030/dive-action@v0.1.1
+      with:
+        image: ${{ steps.meta.outputs.tags }}
+    #
     # code and docker image security scanning
     #
     - uses: aquasecurity/trivy-action@0.14.0
       with:
-        scan-type: "fs"
-        scan-ref: "."
-        exit-code: "1"
+        scan-type: 'fs'
+        scan-ref: '.'
+        exit-code: '1'
         ignore-unfixed: true
-        severity: "CRITICAL,HIGH"
+        severity: 'CRITICAL,HIGH'
     - uses: aquasecurity/trivy-action@0.14.0
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
-        format: "table"
-        exit-code: "1"
+        format: 'table'
+        exit-code: '1'
         ignore-unfixed: true
-        vuln-type: "os,library"
-        severity: "CRITICAL,HIGH"
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
     #
     # log in to GH registry and push the the image
     #
