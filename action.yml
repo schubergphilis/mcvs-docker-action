@@ -1,7 +1,6 @@
 ---
-name: mcaf-mcvs-docker-action
+name: mcvs-docker-action
 description: |
-  The Mission Critical Acceleration Framework (MCAF)
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
   dockle-accept-key:
@@ -14,12 +13,12 @@ inputs:
       applicable, e.g.: `libcrypto3,libssl3`.
   token:
     description: |
-      A token is required to allow the mcaf-mcvs-docker-action to push the
+      A token is required to allow the mcvs-docker-action to push the
       image that it has been built, to the packages repository of the GitHub
       repository where the action has been run.
     required: true
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     #
     # dockerfile linting (static)
@@ -66,19 +65,19 @@ runs:
     #
     - uses: aquasecurity/trivy-action@0.16.0
       with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        exit-code: '1'
+        scan-type: "fs"
+        scan-ref: "."
+        exit-code: "1"
         ignore-unfixed: true
-        severity: 'CRITICAL,HIGH'
+        severity: "CRITICAL,HIGH"
     - uses: aquasecurity/trivy-action@0.16.0
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
-        format: 'table'
-        exit-code: '1'
+        format: "table"
+        exit-code: "1"
         ignore-unfixed: true
-        vuln-type: 'os,library'
-        severity: 'CRITICAL,HIGH'
+        vuln-type: "os,library"
+        severity: "CRITICAL,HIGH"
     #
     # log in to GH registry and push the the image
     #
