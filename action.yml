@@ -18,16 +18,16 @@ inputs:
       repository where the action has been run.
     required: true
 runs:
-  using: "composite"
+  using: 'composite'
   steps:
     #
-    # dockerfile linting (static)
+    # Dockerfile linting (static).
     #
     - uses: hadolint/hadolint-action@v3.1.0
       with:
         dockerfile: Dockerfile
     #
-    # determine image name and tag
+    # Determine image name and tag.
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
@@ -37,7 +37,7 @@ runs:
           latest=false
         images: ghcr.io/${{ github.repository }}
     #
-    # build a docker image
+    # Build a docker image.
     #
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v5.1.0
@@ -47,7 +47,7 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
     #
-    # docker image linting (dynamic)
+    # Docker image linting (dynamic).
     #
     - uses: goodwithtech/dockle-action@v0.1.2
       with:
@@ -55,31 +55,34 @@ runs:
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
     #
-    # detect waste in the docker image
+    # Detect waste in the docker image.
     #
     - uses: 030/dive-action@v0.1.1
       with:
         image: ${{ steps.meta.outputs.tags }}
     #
-    # code and docker image security scanning
+    # Code and docker image security scanning.
     #
+    - uses: 030/trivyignore-validator-action@v0.1.0
     - uses: aquasecurity/trivy-action@0.16.0
       with:
-        scan-type: "fs"
-        scan-ref: "."
-        exit-code: "1"
+        scan-type: 'fs'
+        scan-ref: '.'
+        exit-code: '1'
         ignore-unfixed: true
-        severity: "CRITICAL,HIGH"
+        severity: 'CRITICAL,HIGH'
+        trivyignores: .trivyignore
     - uses: aquasecurity/trivy-action@0.16.0
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
-        format: "table"
-        exit-code: "1"
+        format: 'table'
+        exit-code: '1'
         ignore-unfixed: true
-        vuln-type: "os,library"
-        severity: "CRITICAL,HIGH"
+        vuln-type: 'os,library'
+        severity: 'CRITICAL,HIGH'
+        trivyignores: .trivyignore
     #
-    # log in to GH registry and push the the image
+    # Log in to GitHub packages and push the image.
     #
     - name: Log in to the Container registry
       uses: docker/login-action@v3.0.0
