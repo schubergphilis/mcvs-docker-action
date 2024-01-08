@@ -63,7 +63,7 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: 030/trivyignore-validator-action@v0.1.0
+    - uses: 030/trivyignore-validator-action@v0.1.1
     - uses: aquasecurity/trivy-action@0.16.0
       with:
         scan-type: 'fs'
