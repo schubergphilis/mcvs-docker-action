@@ -85,7 +85,7 @@ runs:
     # Log in to GitHub packages and push the image.
     #
     - name: Log in to the Container registry
-      uses: docker/login-action@v3.0.0
+      uses: docker/login-action@v3.1.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
