@@ -18,7 +18,7 @@ inputs:
       repository where the action has been run.
     required: true
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
     #
     # Dockerfile linting (static).
@@ -63,24 +63,38 @@ runs:
     #
     # Code and docker image security scanning.
     #
+    - uses: anchore/scan-action@v3.6.4
+      with:
+        only-fixed: false
+        output-format: table
+        path: "."
+        severity-cutoff: high
+    - name: Scan image using Grype
+      uses: anchore/scan-action@v3
+      with:
+        image: ${{ steps.meta.outputs.tags }}
+        only-fixed: false
+        output-format: table
+        severity-cutoff: high
     - uses: 030/trivyignore-validator-action@v0.1.2
     - uses: aquasecurity/trivy-action@0.17.0
       with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        exit-code: '1'
+        scan-type: "fs"
+        scan-ref: "."
+        exit-code: "1"
         ignore-unfixed: true
-        severity: 'CRITICAL,HIGH'
+        severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
     - uses: aquasecurity/trivy-action@0.17.0
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
-        format: 'table'
-        exit-code: '1'
+        format: "table"
+        exit-code: "1"
         ignore-unfixed: true
-        vuln-type: 'os,library'
-        severity: 'CRITICAL,HIGH'
+        vuln-type: "os,library"
+        severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
+
     #
     # Log in to GitHub packages and push the image.
     #
