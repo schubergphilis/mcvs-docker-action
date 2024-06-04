@@ -1,5 +1,5 @@
 ---
-name: mcvs-docker-action
+name: MCVS-docker-action
 description: |
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
@@ -20,6 +20,13 @@ inputs:
 runs:
   using: "composite"
   steps:
+    #
+    # YAML linting.
+    #
+    - run: |
+        pip install --user yamllint==1.35.1
+        yamllint .
+      shell: bash
     #
     # Dockerfile linting (static).
     #
@@ -94,7 +101,6 @@ runs:
         vuln-type: "os,library"
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
-
     #
     # Log in to GitHub packages and push the image.
     #
