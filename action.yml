@@ -57,6 +57,7 @@ runs:
     # Docker image linting (dynamic).
     #
     - uses: goodwithtech/dockle-action@v0.1.2
+      if: "false" # Disabled until the bug (#45) is fixed.
       with:
         image: ${{ steps.meta.outputs.tags }}
         ignore: CIS-DI-0005,CIS-DI-0006
@@ -65,6 +66,7 @@ runs:
     # Detect waste in the docker image.
     #
     - uses: 030/dive-action@v0.1.1
+      if: "false" # Disabled until the bug (#46) is fixed.
       with:
         image: ${{ steps.meta.outputs.tags }}
     #

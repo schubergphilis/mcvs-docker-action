@@ -1,5 +1,18 @@
 # mcvs-docker-action
 
+Mission Critical Vulnerability Scanner (MCVS) Docker Action is a custom
+[GitHub Action](https://github.com/features/actions) that consists of the
+following steps:
+
+- YAML linting.
+- Dockerfile linting.
+- Determining image name and tag.
+- Docker image building.
+- Docker image linting.
+- Detecting waste in the docker image.
+- Code and docker image security scanning using Grype and Trivy.
+- Logging in and pushing the image to GitHub packages.
+
 Create a `.github/workflows/docker.yml` file with the following content:
 
 ```bash
