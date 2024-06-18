@@ -86,7 +86,7 @@ runs:
         output-format: table
         severity-cutoff: high
     - uses: 030/trivyignore-validator-action@v0.1.2
-    - uses: aquasecurity/trivy-action@0.22.0
+    - uses: aquasecurity/trivy-action@0.23.0
       with:
         scan-type: "fs"
         scan-ref: "."
@@ -94,7 +94,7 @@ runs:
         ignore-unfixed: true
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
-    - uses: aquasecurity/trivy-action@0.22.0
+    - uses: aquasecurity/trivy-action@0.23.0
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
         format: "table"
