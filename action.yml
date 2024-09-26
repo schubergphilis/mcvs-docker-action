@@ -11,6 +11,14 @@ inputs:
       will be installed then an error will be thrown by Dockle, which is
       incorrect. To mitigate this one has to specify the packages that are
       applicable, e.g.: `libcrypto3,libssl3`.
+  trivy-action-db:
+    default: "ghcr.io/aquasecurity/trivy-db:2"
+    description: |
+      OCI repository to retrieve trivy-db from.
+  trivy-action-java-db:
+    description: |
+      OCI repository to retrieve trivy-java-db from.
+    default: "ghcr.io/aquasecurity/trivy-java-db:1"
   token:
     description: |
       A token is required to allow the mcvs-docker-action to push the
@@ -87,6 +95,11 @@ runs:
         severity-cutoff: high
     - uses: 030/trivyignore-validator-action@v0.1.2
     - uses: aquasecurity/trivy-action@0.23.0
+      env:
+        TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
+        TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
+        TRIVY_PASSWORD: ${{ inputs.token }}
+        TRIVY_USERNAME: ${{ github.actor }}
       with:
         scan-type: "fs"
         scan-ref: "."
@@ -95,6 +108,11 @@ runs:
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
     - uses: aquasecurity/trivy-action@0.23.0
+      env:
+        TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
+        TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
+        TRIVY_PASSWORD: ${{ inputs.token }}
+        TRIVY_USERNAME: ${{ github.actor }}
       with:
         image-ref: ${{ steps.meta.outputs.tags }}
         format: "table"
