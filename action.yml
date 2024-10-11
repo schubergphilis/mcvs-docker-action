@@ -80,14 +80,14 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: anchore/scan-action@v4.1.2
+    - uses: anchore/scan-action@v5.0.0
       with:
         only-fixed: false
         output-format: table
         path: "."
         severity-cutoff: high
     - name: Scan image using Grype
-      uses: anchore/scan-action@v4.1.2
+      uses: anchore/scan-action@v5.0.0
       with:
         image: ${{ steps.meta.outputs.tags }}
         only-fixed: false
