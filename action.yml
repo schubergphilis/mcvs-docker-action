@@ -55,7 +55,7 @@ runs:
     # Build a docker image.
     #
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v6.7.0
+      uses: docker/build-push-action@v6.9.0
       with:
         context: .
         push: false
@@ -132,7 +132,7 @@ runs:
         password: ${{ inputs.token }}
     - name: Build and push Docker image
       if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-      uses: docker/build-push-action@v6.7.0
+      uses: docker/build-push-action@v6.9.0
       with:
         context: .
         push: true
