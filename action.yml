@@ -12,13 +12,13 @@ inputs:
       incorrect. To mitigate this one has to specify the packages that are
       applicable, e.g.: `libcrypto3,libssl3`.
   trivy-action-db:
-    default: "ghcr.io/aquasecurity/trivy-db:2"
+    default: "public.ecr.aws/aquasecurity/trivy-db:2"
     description: |
       OCI repository to retrieve trivy-db from.
   trivy-action-java-db:
+    default: "public.ecr.aws/aquasecurity/trivy-java-db:1"
     description: |
       OCI repository to retrieve trivy-java-db from.
-    default: "ghcr.io/aquasecurity/trivy-java-db:1"
   token:
     description: |
       A token is required to allow the mcvs-docker-action to push the
