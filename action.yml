@@ -3,6 +3,8 @@ name: MCVS-docker-action
 description: |
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
+  build-args:
+    description: Docker build arguments.
   dockle-accept-key:
     description: |
       One of the Dockle checks is the inspection of use of secrets in
@@ -11,6 +13,9 @@ inputs:
       will be installed then an error will be thrown by Dockle, which is
       incorrect. To mitigate this one has to specify the packages that are
       applicable, e.g.: `libcrypto3,libssl3`.
+  images:
+    description: The name of the to be created image.
+    default: ghcr.io/${{ github.repository }}
   trivy-action-db:
     default: "public.ecr.aws/aquasecurity/trivy-db:2"
     description: |
@@ -50,17 +55,18 @@ runs:
       with:
         flavor: |
           latest=false
-        images: ghcr.io/${{ github.repository }}
+        images: ${{ inputs.images }}
     #
     # Build a docker image.
     #
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v6.9.0
       with:
+        build-args: APPLICATION=${{ inputs.build-args }}
         context: .
+        labels: ${{ steps.meta.outputs.labels }}
         push: false
         tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
     #
     # Docker image linting (dynamic).
     #
@@ -132,9 +138,6 @@ runs:
         password: ${{ inputs.token }}
     - name: Build and push Docker image
       if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-      uses: docker/build-push-action@v6.9.0
-      with:
-        context: .
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
+      run: |
+        docker push --all-tags ${{ inputs.images }}
+      shell: bash
