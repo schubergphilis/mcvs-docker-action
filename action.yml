@@ -42,7 +42,7 @@ runs:
     #
     - run: |
         pip install --user yamllint==1.35.1
-        yamllint ${{ inputs.context }}
+        yamllint .
       shell: bash
     #
     # Dockerfile linting (static).
