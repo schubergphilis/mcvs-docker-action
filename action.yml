@@ -30,6 +30,10 @@ inputs:
       image that it has been built, to the packages repository of the GitHub
       repository where the action has been run.
     required: true
+  context:
+    default: "."
+    description: |
+      Directory path that contains all the files needed to build a Docker image
 runs:
   using: "composite"
   steps:
@@ -45,7 +49,7 @@ runs:
     #
     - uses: hadolint/hadolint-action@v3.1.0
       with:
-        dockerfile: Dockerfile
+        dockerfile: ${{ inputs.context }}/Dockerfile
     #
     # Determine image name and tag.
     #
@@ -63,7 +67,7 @@ runs:
       uses: docker/build-push-action@v6.10.0
       with:
         build-args: APPLICATION=${{ inputs.build-args }}
-        context: .
+        context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
         push: false
         tags: ${{ steps.meta.outputs.tags }}
@@ -90,7 +94,7 @@ runs:
       with:
         only-fixed: false
         output-format: table
-        path: "."
+        path: ${{ inputs.context }}
         severity-cutoff: high
     - name: Scan image using Grype
       uses: anchore/scan-action@v6.0.0
@@ -108,7 +112,7 @@ runs:
         TRIVY_USERNAME: ${{ github.actor }}
       with:
         scan-type: "fs"
-        scan-ref: "."
+        scan-ref: ${{ inputs.context }}
         exit-code: "1"
         ignore-unfixed: true
         severity: "CRITICAL,HIGH"

@@ -38,6 +38,7 @@ jobs:
 | Option               | Default | Required |
 | :------------------- | :------ | -------- |
 | build-args           |         |          |
+| context              | x       |          |
 | dockle-accept-key    | x       |          |
 | images               | x       |          |
 | token                | x       | x        |
