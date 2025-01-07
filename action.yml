@@ -74,7 +74,7 @@ runs:
     #
     # Docker image linting (dynamic).
     #
-    - uses: goodwithtech/dockle-action@v0.1.2
+    - uses: goodwithtech/dockle-action@v0.4.15
       if: "false" # Disabled until the bug (#45) is fixed.
       with:
         image: ${{ steps.meta.outputs.tags }}
