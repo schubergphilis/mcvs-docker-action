@@ -64,7 +64,7 @@ runs:
     # Build a docker image.
     #
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v6.13.0
+      uses: docker/build-push-action@v6.14.0
       with:
         build-args: APPLICATION=${{ inputs.build-args }}
         context: ${{ inputs.context }}
