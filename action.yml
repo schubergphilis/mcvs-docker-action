@@ -55,7 +55,7 @@ runs:
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
-      uses: docker/metadata-action@v5.6.1
+      uses: docker/metadata-action@v5.7.0
       with:
         flavor: |
           latest=false
@@ -64,7 +64,7 @@ runs:
     # Build a docker image.
     #
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v6.14.0
+      uses: docker/build-push-action@v6.15.0
       with:
         build-args: APPLICATION=${{ inputs.build-args }}
         context: ${{ inputs.context }}
