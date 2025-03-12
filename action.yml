@@ -5,6 +5,10 @@ description: |
 inputs:
   build-args:
     description: Docker build arguments.
+  context:
+    default: "."
+    description: |
+      Directory path that contains all the files needed to build a Docker image
   dockle-accept-key:
     description: |
       One of the Dockle checks is the inspection of use of secrets in
@@ -30,10 +34,6 @@ inputs:
       image that it has been built, to the packages repository of the GitHub
       repository where the action has been run.
     required: true
-  context:
-    default: "."
-    description: |
-      Directory path that contains all the files needed to build a Docker image
 runs:
   using: "composite"
   steps:
@@ -75,7 +75,6 @@ runs:
     # Docker image linting (dynamic).
     #
     - uses: goodwithtech/dockle-action@v0.4.15
-      if: "false" # Disabled until the bug (#45) is fixed.
       with:
         image: ${{ steps.meta.outputs.tags }}
         ignore: CIS-DI-0005,CIS-DI-0006
