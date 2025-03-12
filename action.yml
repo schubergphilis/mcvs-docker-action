@@ -77,6 +77,11 @@ runs:
     - uses: goodwithtech/dockle-action@v0.4.15
       with:
         image: ${{ steps.meta.outputs.tags }}
+        # CIS-DI-0005: Enable Content trust for Docker as this cannot be
+        # achieved in public GitHub runners.
+        # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
+        # the decision was made that this is up to the consumer of this action
+        # to set a health check or not.
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
     #
