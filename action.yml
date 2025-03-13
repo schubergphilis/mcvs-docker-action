@@ -88,10 +88,9 @@ runs:
     #
     # Detect waste in the docker image.
     #
-    - uses: 030/dive-action@v0.1.1
-      if: "false" # Disabled until the bug (#46) is fixed.
+    - uses: docker://wagoodman/dive:v0.12.0
       with:
-        image: ${{ steps.meta.outputs.tags }}
+        args: ${{ steps.meta.outputs.tags }} --ci
     #
     # Code and docker image security scanning.
     #
