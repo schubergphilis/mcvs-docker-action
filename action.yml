@@ -50,6 +50,7 @@ runs:
     - uses: hadolint/hadolint-action@v3.1.0
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
+        failure-threshold: style
     #
     # Determine image name and tag.
     #
