@@ -108,7 +108,7 @@ runs:
         output-format: table
         severity-cutoff: high
     - uses: 030/trivyignore-validator-action@v0.1.2
-    - uses: aquasecurity/trivy-action@0.29.0
+    - uses: aquasecurity/trivy-action@0.30.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
@@ -121,7 +121,7 @@ runs:
         ignore-unfixed: true
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
-    - uses: aquasecurity/trivy-action@0.29.0
+    - uses: aquasecurity/trivy-action@0.30.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
@@ -139,7 +139,7 @@ runs:
     # Log in to GitHub packages and push the image.
     #
     - name: Log in to the Container registry
-      uses: docker/login-action@v3.3.0
+      uses: docker/login-action@v3.4.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
