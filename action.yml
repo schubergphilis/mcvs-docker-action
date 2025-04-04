@@ -41,12 +41,13 @@ runs:
   using: "composite"
   steps:
     #
-    # YAML linting.
+    # linting.
     #
     - run: |
         pip install --user yamllint==1.35.1
         yamllint .
       shell: bash
+    - uses: wagoid/commitlint-github-action@v6.2.1
     #
     # Dockerfile linting (static).
     #
