@@ -3,6 +3,12 @@ name: MCVS-docker-action
 description: |
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
+  target:
+    description: |
+      The target of the stage to be built. This is used to determine the stage
+      to be built in the Dockerfile. If not specified, the last stage in the
+      Dockerfile will be built.
+    default: ""
   build-args:
     description: Docker build arguments.
   context:
@@ -75,6 +81,7 @@ runs:
         labels: ${{ steps.meta.outputs.labels }}
         push: false
         tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ inputs.target }}
     #
     # Docker image linting (dynamic).
     #
