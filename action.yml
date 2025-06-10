@@ -68,7 +68,7 @@ runs:
     # Build a docker image.
     #
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v6.16.0
+      uses: docker/build-push-action@v6.18.0
       with:
         build-args: APPLICATION=${{ inputs.build-args }}
         context: ${{ inputs.context }}
@@ -113,7 +113,7 @@ runs:
         output-format: table
         severity-cutoff: high
     - uses: 030/trivyignore-validator-action@v0.1.2
-    - uses: aquasecurity/trivy-action@0.30.0
+    - uses: aquasecurity/trivy-action@0.31.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
@@ -126,7 +126,7 @@ runs:
         ignore-unfixed: true
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
-    - uses: aquasecurity/trivy-action@0.30.0
+    - uses: aquasecurity/trivy-action@0.31.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
