@@ -26,6 +26,17 @@ permissions:
   packages: write
 jobs:
   mcvs-docker-action:
+    strategy:
+        matrix:
+          include:
+            - name: scanner
+              build_args:
+                APPLICATION: my-scanner
+                APPLICATION_PERMISSIONS: 0700
+            - name: analyzer
+              build_args:
+                APPLICATION: my-analyzer
+                APPLICATION_PERMISSIONS: 0755
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4.1.1
@@ -33,6 +44,9 @@ jobs:
         with:
           dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
+          build-args: |
+            APPLICATION=${{ matrix.build_args.APPLICATION }}
+            APPLICATION_PERMISSIONS=${{ matrix.build_args.APPLICATION_PERMISSIONS }}
 ```
 
 | Option               | Default | Required |

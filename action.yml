@@ -3,6 +3,9 @@ name: MCVS-docker-action
 description: |
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
+  application:
+    default: mcvs-scanner
+    description: The name of the application that is being built.
   build-args:
     description: Docker build arguments.
   context:
@@ -69,7 +72,7 @@ runs:
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v6.18.0
       with:
-        build-args: APPLICATION=${{ inputs.build-args }}
+        build-args: ${{ inputs.build-args }} APPLICATION=${{ inputs.application }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
         push: false
