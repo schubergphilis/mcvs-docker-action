@@ -34,7 +34,7 @@ jobs:
           dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
-            SOME_ARG= ${{ matrix.build_args.SOME_ARG }}
+            SOME_ARG= "my argument"
 ```
 
 | Option               | Default | Required |
