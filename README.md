@@ -34,7 +34,7 @@ jobs:
           dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
-            SOME_ARG= "my argument"
+            SOME_ARG="my argument"
 ```
 
 | Option               | Default | Required |
