@@ -26,12 +26,6 @@ permissions:
   packages: write
 jobs:
   mcvs-docker-action:
-    strategy:
-        matrix:
-          include:
-            - name: my-argument
-              build_args:
-                SOME_ARG: my-arg
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4.1.1
