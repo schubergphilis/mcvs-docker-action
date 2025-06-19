@@ -40,7 +40,7 @@ jobs:
 | build-args           |         |          |
 | context              | x       |          |
 | dockle-accept-key    | x       |          |
-| grype-version        | x       |          |
+| grype-version        |         |          |
 | images               | x       |          |
 | token                | x       | x        |
 | trivy-action-db      | x       |          |
