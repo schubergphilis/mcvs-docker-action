@@ -29,14 +29,9 @@ jobs:
     strategy:
         matrix:
           include:
-            - name: scanner
+            - name: my-argument
               build_args:
-                APPLICATION: my-scanner
-                APPLICATION_PERMISSIONS: 0700
-            - name: analyzer
-              build_args:
-                APPLICATION: my-analyzer
-                APPLICATION_PERMISSIONS: 0755
+                SOME_ARG: my-arg
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v4.1.1
@@ -45,8 +40,7 @@ jobs:
           dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
-            APPLICATION=${{ matrix.build_args.APPLICATION }}
-            APPLICATION_PERMISSIONS=${{ matrix.build_args.APPLICATION_PERMISSIONS }}
+            SOME_ARG= ${{ matrix.build_args.SOME_ARG }}
 ```
 
 | Option               | Default | Required |
