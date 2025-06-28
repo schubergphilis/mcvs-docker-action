@@ -4,11 +4,13 @@ description: |
   Mission Critical Vulnerability Scanner (MCVS) Docker action.
 inputs:
   build-args:
-    description: Docker build arguments.
+    description: |
+      Docker build arguments. Passed as-is if multiline, else formatted as
+      `APPLICATION=value`.
   context:
     default: "."
     description: |
-      Directory path that contains all the files needed to build a Docker image
+      Directory path that contains all the files needed to build a Docker image.
   dockle-accept-key:
     description: |
       One of the Dockle checks is the inspection of use of secrets in
@@ -66,10 +68,26 @@ runs:
     #
     # Build a docker image.
     #
+    - name: Set build-args
+      id: parse
+      shell: bash
+      run: |
+        echo "inputs.build-args:"
+        echo "${{ inputs.build-args }}"
+
+        if [[ "${{ inputs.build-args }}" == *$'\n'* ]]; then
+          echo "Detected multiline build-args"
+          echo "build_args<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ inputs.build-args }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "Detected single-line build-arg"
+          echo "build_args=APPLICATION=${{ inputs.build-args }}" >> $GITHUB_OUTPUT
+        fi
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v6.18.0
       with:
-        build-args: APPLICATION=${{ inputs.build-args }}
+        build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
         push: false
