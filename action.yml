@@ -24,6 +24,16 @@ inputs:
   images:
     description: The name of the to be created image.
     default: ghcr.io/${{ github.repository }}
+  push-to-container-registry:
+    description: |
+      Specify the container registry to which the image must be pushed. Set the
+      value to: "" to disable pushing to a container registry.
+    default: ghcr
+  token:
+    description: |
+      A token is required to allow the mcvs-docker-action to push the
+      image that it has been built, to the packages repository of the GitHub
+      repository where the action has been run.
   trivy-action-db:
     default: "public.ecr.aws/aquasecurity/trivy-db:2"
     description: |
@@ -32,12 +42,6 @@ inputs:
     default: "public.ecr.aws/aquasecurity/trivy-java-db:1"
     description: |
       OCI repository to retrieve trivy-java-db from.
-  token:
-    description: |
-      A token is required to allow the mcvs-docker-action to push the
-      image that it has been built, to the packages repository of the GitHub
-      repository where the action has been run.
-    required: true
 runs:
   using: "composite"
   steps:
@@ -122,20 +126,6 @@ runs:
         only-fixed: false
         output-format: table
         severity-cutoff: high
-    - uses: 030/trivyignore-validator-action@v0.1.2
-    - uses: aquasecurity/trivy-action@0.32.0
-      env:
-        TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
-        TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
-        TRIVY_PASSWORD: ${{ inputs.token }}
-        TRIVY_USERNAME: ${{ github.actor }}
-      with:
-        scan-type: "fs"
-        scan-ref: ${{ inputs.context }}
-        exit-code: "1"
-        ignore-unfixed: true
-        severity: "CRITICAL,HIGH"
-        trivyignores: .trivyignore
     - uses: aquasecurity/trivy-action@0.32.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
@@ -160,7 +150,10 @@ runs:
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Build and push Docker image
-      if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+      if: |
+        github.event_name == 'push' &&
+        contains(github.ref, 'refs/tags/') &&
+        inputs.push-to-container-registry == 'ghcr'
       run: |
         docker push --all-tags ${{ inputs.images }}
       shell: bash
