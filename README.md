@@ -26,25 +26,37 @@ permissions:
   packages: write
 jobs:
   mcvs-docker-action:
-    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        args:
+          - build-args: some-app
+            context: some/path/to/Dockerfile/home
+            image-suffix: ""
+          - build-args: some-app-cli
+            image-suffix: /some-app-cli
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4.1.1
+      - uses: actions/checkout@v4.2.2
       - uses: schubergphilis/mcvs-docker-action@v0.1.0
         with:
+          build-args: ${{ matrix.args.build-args }}
+          images: |-
+            ghcr.io/${{ github.repository }}${{ matrix.args.image-suffix }}
           dockle-accept-key: libcrypto3,libssl3
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-| Option               | Default | Required |
-| :------------------- | :------ | -------- |
-| build-args           |         |          |
-| context              | x       |          |
-| dockle-accept-key    | x       |          |
-| grype-version        |         |          |
-| images               | x       |          |
-| token                | x       | x        |
-| trivy-action-db      | x       |          |
-| trivy-action-java-db | x       |          |
+| Option                     | Default | Required |
+| :------------------------- | :------ | -------- |
+| build-args                 |         |          |
+| context                    | x       |          |
+| dockle-accept-key          | x       |          |
+| grype-version              |         |          |
+| images                     | x       |          |
+| push-to-container-registry | x       |          |
+| token                      | x       |          |
+| trivy-action-db            | x       |          |
+| trivy-action-java-db       | x       |          |
 
 Note: If an **x** is registered in the Default column, refer to the
 [action.yml](action.yml) for the corresponding value.
