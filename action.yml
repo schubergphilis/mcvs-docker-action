@@ -48,7 +48,7 @@ runs:
     #
     # Dockerfile linting (static).
     #
-    - uses: hadolint/hadolint-action@v3.1.0
+    - uses: hadolint/hadolint-action@v3.2.0
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
@@ -126,7 +126,7 @@ runs:
         only-fixed: false
         output-format: table
         severity-cutoff: high
-    - uses: aquasecurity/trivy-action@0.32.0
+    - uses: aquasecurity/trivy-action@0.33.1
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
