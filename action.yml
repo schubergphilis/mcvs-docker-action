@@ -48,7 +48,7 @@ runs:
     #
     # Dockerfile linting (static).
     #
-    - uses: hadolint/hadolint-action@v3.1.0
+    - uses: hadolint/hadolint-action@v3.3.0
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
@@ -111,7 +111,7 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: anchore/scan-action@v6.5.1
+    - uses: anchore/scan-action@v7.0.0
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
@@ -119,14 +119,14 @@ runs:
         path: ${{ inputs.context }}
         severity-cutoff: high
     - name: Scan image using Grype
-      uses: anchore/scan-action@v6.5.1
+      uses: anchore/scan-action@v7.0.0
       with:
         grype-version: ${{ inputs.grype-version }}
         image: ${{ steps.meta.outputs.tags }}
         only-fixed: false
         output-format: table
         severity-cutoff: high
-    - uses: aquasecurity/trivy-action@0.32.0
+    - uses: aquasecurity/trivy-action@0.33.1
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
