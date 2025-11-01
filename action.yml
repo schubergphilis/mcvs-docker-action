@@ -111,7 +111,7 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: anchore/scan-action@v7.0.0
+    - uses: anchore/scan-action@v7.0.2
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
@@ -119,7 +119,7 @@ runs:
         path: ${{ inputs.context }}
         severity-cutoff: high
     - name: Scan image using Grype
-      uses: anchore/scan-action@v7.0.0
+      uses: anchore/scan-action@v7.0.2
       with:
         grype-version: ${{ inputs.grype-version }}
         image: ${{ steps.meta.outputs.tags }}
