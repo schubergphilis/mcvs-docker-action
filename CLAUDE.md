@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerability Scanner (MCVS). It provides a comprehensive Docker image security and quality validation pipeline. This is not a traditional application with source code - it's a GitHub Action defined entirely in `action.yml`.
 
+**Key files**:
+- `action.yml`: The complete action definition (inputs, steps, logic)
+- `README.md`: Comprehensive user documentation with examples
+- `CLAUDE.md`: This file - guidance for Claude Code
+- `.github/workflows/mcvs-pr-validation.yml`: PR validation workflow
+- `.github/dependabot.yml`: Automated dependency updates
+
 ## Action Architecture
 
 The action executes a sequential pipeline defined in `action.yml` (lines 46-159):
@@ -55,9 +62,39 @@ To test local changes before pushing:
 ## Important Inputs
 
 - `images`: Default is `ghcr.io/${{ github.repository }}`. Override when using custom image names or matrix builds with suffixes.
+- `build-args`: Supports both single-line (auto-formatted as `APPLICATION=value`) and multiline (passed as-is) formats.
 - `dockle-accept-key`: Workaround for false positives when specific package versions trigger Dockle's secret detection (see goodwithtech/dockle#250).
 - `trivy-action-db` and `trivy-action-java-db`: Allow using alternative OCI repositories for vulnerability databases.
 - `push-to-container-registry`: Set to empty string `""` to disable pushing entirely.
+- `token`: Required for pushing to GHCR. Typically `${{ secrets.GITHUB_TOKEN }}`.
+
+## Common Modification Patterns
+
+### Adding a New Input
+1. Add input definition to `action.yml` inputs section with description and optional default
+2. Use the input in the appropriate step with `${{ inputs.input-name }}`
+3. Update README.md input parameters table
+4. Add usage example to README.md if the input enables a new use case
+5. Update CLAUDE.md Important Inputs section if there are special considerations
+
+### Adding a New Security Tool
+1. Add new step in the appropriate section of action.yml:46-159
+2. Consider placement in the pipeline (static analysis before build, dynamic after)
+3. Add description to README.md Features section
+4. Add configuration details to README.md Security Scanning section
+5. Update CLAUDE.md Action Architecture section with step number and purpose
+
+### Modifying Scanner Configuration
+1. Update the relevant step in action.yml
+2. Document the change in README.md Security Scanning section
+3. If behavior changes significantly, add to README.md Troubleshooting section
+4. Update CLAUDE.md if the design pattern or rationale changes
+
+### Changing Push Behavior
+1. Modify the conditional in action.yml:153-156
+2. Update README.md Image Push Behavior section with new conditions
+3. Add troubleshooting entry if the change might confuse users
+4. Update CLAUDE.md Conditional Push Logic section
 
 ## Dependabot Configuration
 
@@ -72,3 +109,23 @@ Two Dockle CIS checks are permanently ignored (action.yml:98-102):
 ## Workflow Validation
 
 The repository uses `schubergphilis/mcvs-pr-validation-action` on all PRs (`.github/workflows/mcvs-pr-validation.yml`) to enforce PR standards.
+
+## Documentation Conventions
+
+### README.md
+- User-facing documentation with comprehensive examples
+- Should include: quick start, usage examples, input parameters table, troubleshooting
+- Examples should be copy-paste ready and demonstrate common use cases
+- Keep technical details balanced - enough to understand but not overwhelming
+
+### CLAUDE.md
+- Technical reference for Claude Code
+- Should include: architecture details, design patterns, line number references to code
+- Focus on "why" decisions were made, not just "what" the code does
+- Update when adding new features or changing architectural patterns
+
+### Keeping Docs in Sync
+- When adding new inputs to action.yml, update both README.md (user table) and CLAUDE.md (technical notes if needed)
+- When changing behavior, update README.md examples and CLAUDE.md design patterns section
+- README.md is the source of truth for user documentation
+- CLAUDE.md is the source of truth for implementation guidance
