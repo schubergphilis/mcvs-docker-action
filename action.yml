@@ -57,7 +57,7 @@ runs:
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
-      uses: docker/metadata-action@v5.9.0
+      uses: docker/metadata-action@v5.10.0
       with:
         flavor: |
           latest=false
@@ -82,7 +82,7 @@ runs:
           echo "build_args=APPLICATION=${{ inputs.build-args }}" >> $GITHUB_OUTPUT
         fi
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v6.18.0
+      uses: docker/build-push-action@v6.19.2
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
@@ -111,7 +111,7 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: anchore/scan-action@v7.1.0
+    - uses: anchore/scan-action@v7.3.2
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
@@ -119,14 +119,14 @@ runs:
         path: ${{ inputs.context }}
         severity-cutoff: high
     - name: Scan image using Grype
-      uses: anchore/scan-action@v7.1.0
+      uses: anchore/scan-action@v7.3.2
       with:
         grype-version: ${{ inputs.grype-version }}
         image: ${{ steps.meta.outputs.tags }}
         only-fixed: false
         output-format: table
         severity-cutoff: high
-    - uses: aquasecurity/trivy-action@0.33.1
+    - uses: aquasecurity/trivy-action@0.34.0
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
@@ -144,7 +144,7 @@ runs:
     # Log in to GitHub packages and push the image.
     #
     - name: Log in to the Container registry
-      uses: docker/login-action@v3.6.0
+      uses: docker/login-action@v3.7.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
