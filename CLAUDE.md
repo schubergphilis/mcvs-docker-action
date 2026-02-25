@@ -15,18 +15,19 @@ MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerabili
 
 ## Action Architecture
 
-The action executes a sequential pipeline defined in `action.yml` (lines 46-159):
+The action executes a sequential pipeline defined in `action.yml` (lines 55-178):
 
 1. **Dockerfile Linting** (hadolint) - Static analysis of Dockerfile syntax and best practices
 2. **Metadata Extraction** (docker/metadata-action) - Generates image tags and labels from Git context
-3. **Build Arguments Parsing** - Handles both single-line and multiline build-args inputs
+3. **Build Arguments Parsing** - Handles both single-line and multiline build-args inputs (uses env var for injection safety)
 4. **Image Building** (docker/build-push-action) - Builds Docker image without pushing
 5. **Image Linting** (dockle) - Dynamic analysis of built image for CIS benchmarks
 6. **Waste Detection** (dive) - Analyzes image layers for efficiency
 7. **Code Scanning** (anchore/scan-action with Grype) - Scans source code context for vulnerabilities
 8. **Image Scanning** (anchore/scan-action with Grype) - Scans built image for vulnerabilities
 9. **Trivy Scanning** (aquasecurity/trivy-action) - Additional image vulnerability scanning
-10. **Registry Push** (docker/login-action + docker push) - Pushes to GHCR only on tag push events
+10. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
+11. **Registry Push** (docker push) - Pushes to configured registry on tag push events
 
 ## Key Design Patterns
 
@@ -42,10 +43,14 @@ Three vulnerability scanners are used with different focuses:
 - **Dockle**: CIS Docker benchmark compliance with known ignores (action.yml:95-104)
 
 ### Conditional Push Logic
-Images are only pushed when all conditions are met (action.yml:153-156):
+Login steps are conditional on the registry selection (action.yml:157-169):
+- GHCR login: runs when `push-to-container-registry == 'ghcr'`
+- Docker Hub login: runs when `push-to-container-registry == 'dockerhub'`
+
+Images are only pushed when all conditions are met (action.yml:170-177):
 - Event is a push (not PR)
 - Reference contains `refs/tags/` (tagged release)
-- Input `push-to-container-registry` equals `ghcr`
+- Input `push-to-container-registry` is not empty (supports both `ghcr` and `dockerhub`)
 
 ## Testing This Action
 
@@ -61,12 +66,13 @@ To test local changes before pushing:
 
 ## Important Inputs
 
-- `images`: Default is `ghcr.io/${{ github.repository }}`. Override when using custom image names or matrix builds with suffixes.
+- `images`: Default is `ghcr.io/${{ github.repository }}`. Override when using Docker Hub (e.g., `my-org/my-app`), custom image names, or matrix builds with suffixes.
 - `build-args`: Supports both single-line (auto-formatted as `APPLICATION=value`) and multiline (passed as-is) formats.
 - `dockle-accept-key`: Workaround for false positives when specific package versions trigger Dockle's secret detection (see goodwithtech/dockle#250).
 - `trivy-action-db` and `trivy-action-java-db`: Allow using alternative OCI repositories for vulnerability databases.
-- `push-to-container-registry`: Set to empty string `""` to disable pushing entirely.
-- `token`: Required for pushing to GHCR. Typically `${{ secrets.GITHUB_TOKEN }}`.
+- `push-to-container-registry`: Set to `ghcr` (default), `dockerhub`, or empty string `""` to disable pushing entirely.
+- `dockerhub-username` and `dockerhub-token`: Required when `push-to-container-registry` is `dockerhub`. Typically sourced from `${{ secrets.DOCKERHUB_USERNAME }}` and `${{ secrets.DOCKERHUB_TOKEN }}`.
+- `token`: Required for pushing to GHCR and Trivy authentication. Typically `${{ secrets.GITHUB_TOKEN }}`.
 
 ## Common Modification Patterns
 

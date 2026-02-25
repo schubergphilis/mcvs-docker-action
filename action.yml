@@ -24,10 +24,19 @@ inputs:
   images:
     description: The name of the to be created image.
     default: ghcr.io/${{ github.repository }}
+  dockerhub-username:
+    description: |
+      Docker Hub username. Required when push-to-container-registry is set to
+      'dockerhub'.
+  dockerhub-token:
+    description: |
+      Docker Hub access token. Required when push-to-container-registry is set
+      to 'dockerhub'.
   push-to-container-registry:
     description: |
       Specify the container registry to which the image must be pushed. Set the
-      value to: "" to disable pushing to a container registry.
+      value to: 'ghcr' for GitHub Container Registry, 'dockerhub' for Docker
+      Hub, or '' to disable pushing to a container registry.
     default: ghcr
   token:
     description: |
@@ -68,18 +77,20 @@ runs:
     - name: Set build-args
       id: parse
       shell: bash
+      env:
+        BUILD_ARGS: ${{ inputs.build-args }}
       run: |
         echo "inputs.build-args:"
-        echo "${{ inputs.build-args }}"
+        echo "$BUILD_ARGS"
 
-        if [[ "${{ inputs.build-args }}" == *$'\n'* ]]; then
+        if [[ "$BUILD_ARGS" == *$'\n'* ]]; then
           echo "Detected multiline build-args"
           echo "build_args<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ inputs.build-args }}" >> $GITHUB_OUTPUT
+          echo "$BUILD_ARGS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         else
           echo "Detected single-line build-arg"
-          echo "build_args=APPLICATION=${{ inputs.build-args }}" >> $GITHUB_OUTPUT
+          echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@v6.19.2
@@ -141,19 +152,26 @@ runs:
         severity: "CRITICAL,HIGH"
         trivyignores: .trivyignore
     #
-    # Log in to GitHub packages and push the image.
+    # Log in to the container registry and push the image.
     #
-    - name: Log in to the Container registry
+    - name: Log in to GitHub Container Registry
+      if: inputs.push-to-container-registry == 'ghcr'
       uses: docker/login-action@v3.7.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
-    - name: Build and push Docker image
+    - name: Log in to Docker Hub
+      if: inputs.push-to-container-registry == 'dockerhub'
+      uses: docker/login-action@v3.7.0
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+    - name: Push Docker image
       if: |
         github.event_name == 'push' &&
         contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry == 'ghcr'
+        inputs.push-to-container-registry != ''
       run: |
         docker push --all-tags ${{ inputs.images }}
       shell: bash
