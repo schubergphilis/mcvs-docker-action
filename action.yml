@@ -137,7 +137,7 @@ runs:
         only-fixed: false
         output-format: table
         severity-cutoff: high
-    - uses: aquasecurity/trivy-action@0.34.0
+    - uses: aquasecurity/trivy-action@0.34.1
       env:
         TRIVY_DB_REPOSITORY: ${{ inputs.trivy-action-db }}
         TRIVY_JAVA_DB_REPOSITORY: ${{ inputs.trivy-action-java-db }}
