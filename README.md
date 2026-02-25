@@ -17,7 +17,7 @@ This action provides a complete CI/CD pipeline for Docker images with the follow
 - **Multi-Scanner Security**: Triple-layer security scanning with:
   - **Grype**: Scans both source code and built images for vulnerabilities
   - **Trivy**: Additional image scanning with configurable vulnerability databases
-- **Automated Registry Push**: Conditional push to GitHub Container Registry on tagged releases
+- **Automated Registry Push**: Conditional push to GitHub Container Registry or Docker Hub on tagged releases
 
 ## Quick Start
 
@@ -145,6 +145,20 @@ Use custom OCI repositories for Trivy vulnerability databases:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Push to Docker Hub
+
+Push images to Docker Hub instead of GHCR:
+
+```yaml
+- uses: schubergphilis/mcvs-docker-action@v0.1.0
+  with:
+    images: my-org/my-app
+    push-to-container-registry: dockerhub
+    dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+    dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+    token: ${{ secrets.GITHUB_TOKEN }}
+```
+
 ### Disable Registry Push
 
 Build and scan without pushing to any registry:
@@ -160,11 +174,13 @@ Build and scan without pushing to any registry:
 
 | Parameter                    | Required | Default                                       | Description                                                                                                                                                                                     |
 | ---------------------------- | -------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `token`                      | No       | -                                             | GitHub token for pushing images to GHCR. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                                                      |
+| `token`                      | No       | -                                             | GitHub token for pushing images to GHCR and Trivy authentication. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                             |
 | `build-args`                 | No       | -                                             | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
 | `context`                    | No       | `.`                                           | Directory containing the Dockerfile and build context                                                                                                                                           |
-| `images`                     | No       | `ghcr.io/${{ github.repository }}`            | Image name(s) for tagging. Supports multiline for multiple registries                                                                                                                           |
-| `push-to-container-registry` | No       | `ghcr`                                        | Registry to push to. Set to `""` to disable pushing                                                                                                                                             |
+| `images`                     | No       | `ghcr.io/${{ github.repository }}`            | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
+| `push-to-container-registry` | No       | `ghcr`                                        | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                   |
+| `dockerhub-username`         | No       | -                                             | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
+| `dockerhub-token`            | No       | -                                             | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
 | `dockle-accept-key`          | No       | -                                             | Comma-separated list of package names to exclude from Dockle secret detection. Use for known false positives (see [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)) |
 | `grype-version`              | No       | latest                                        | Specific version of Grype to use for vulnerability scanning                                                                                                                                     |
 | `trivy-action-db`            | No       | `public.ecr.aws/aquasecurity/trivy-db:2`      | OCI repository for Trivy vulnerability database                                                                                                                                                 |
@@ -200,11 +216,17 @@ This action employs a defense-in-depth approach with multiple security scanners:
 
 ## Image Push Behavior
 
-Images are automatically pushed to GitHub Container Registry **only when all conditions are met**:
+Images are automatically pushed to the configured container registry **only when all conditions are met**:
 
 1. The workflow is triggered by a `push` event (not pull requests)
 2. The push is to a Git tag (matches `refs/tags/*`)
-3. The `push-to-container-registry` input is set to `ghcr` (default)
+3. The `push-to-container-registry` input is set to `ghcr` or `dockerhub`
+
+| Registry | `push-to-container-registry` | `images` override needed? | Credentials |
+|----------|------------------------------|---------------------------|-------------|
+| GHCR     | `ghcr` (default)             | No                        | `token` (GITHUB_TOKEN) |
+| Docker Hub | `dockerhub`               | Yes (e.g., `my-org/my-app`) | `dockerhub-username` + `dockerhub-token` |
+| None     | `""`                         | -                         | - |
 
 This ensures images are only published for tagged releases, keeping your registry clean and organized.
 
@@ -234,13 +256,16 @@ See [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)
 
 ### Image Not Pushed to Registry
 
-**Problem**: The image builds successfully but doesn't appear in GHCR.
+**Problem**: The image builds successfully but doesn't appear in the registry.
 
 **Possible causes**:
 
 1. Not using a tag: Push only occurs on tag events (e.g., `v1.0.0`)
-2. Missing permissions: Ensure `packages: write` permission is set
+2. Missing permissions: Ensure `packages: write` permission is set (GHCR)
 3. Push disabled: Check if `push-to-container-registry` is set to `""`
+4. Wrong registry: Ensure `push-to-container-registry` matches your intended registry (`ghcr` or `dockerhub`)
+5. Docker Hub credentials: When using `dockerhub`, ensure both `dockerhub-username` and `dockerhub-token` are provided
+6. Image name mismatch: When using Docker Hub, override `images` to match your Docker Hub repository (e.g., `my-org/my-app`)
 
 ### Build Arguments Not Working
 
