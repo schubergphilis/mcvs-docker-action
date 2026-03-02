@@ -43,6 +43,10 @@ inputs:
       A token is required to allow the mcvs-docker-action to push the
       image that it has been built, to the packages repository of the GitHub
       repository where the action has been run.
+  trivy-version:
+    default: "v0.69.2"
+    description: |
+      The Trivy CLI version to be used by the aquasecurity/trivy-action.
   trivy-action-db:
     default: "public.ecr.aws/aquasecurity/trivy-db:2"
     description: |
@@ -144,6 +148,7 @@ runs:
         TRIVY_PASSWORD: ${{ inputs.token }}
         TRIVY_USERNAME: ${{ github.actor }}
       with:
+        version: ${{ inputs.trivy-version }}
         image-ref: ${{ steps.meta.outputs.tags }}
         format: "table"
         exit-code: "1"
