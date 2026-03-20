@@ -16,7 +16,6 @@ This action provides a complete CI/CD pipeline for Docker images with the follow
 - **Efficiency Analysis**: Layer-by-layer waste detection using [Dive](https://github.com/wagoodman/dive)
 - **Multi-Scanner Security**: Triple-layer security scanning with:
   - **Grype**: Scans both source code and built images for vulnerabilities
-  - **Trivy**: Additional image scanning with configurable vulnerability databases
 - **Automated Registry Push**: Conditional push to GitHub Container Registry or Docker Hub on tagged releases
 
 ## Quick Start
@@ -133,18 +132,6 @@ When Dockle incorrectly flags specific package versions as secrets:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### Using Alternative Trivy Databases
-
-Use custom OCI repositories for Trivy vulnerability databases:
-
-```yaml
-- uses: schubergphilis/mcvs-docker-action@v0.1.0
-  with:
-    trivy-action-db: ghcr.io/my-org/trivy-db:2
-    trivy-action-java-db: ghcr.io/my-org/trivy-java-db:1
-    token: ${{ secrets.GITHUB_TOKEN }}
-```
-
 ### Push to Docker Hub
 
 Push images to Docker Hub instead of GHCR:
@@ -172,19 +159,17 @@ Build and scan without pushing to any registry:
 
 ## Input Parameters
 
-| Parameter                    | Required | Default                                       | Description                                                                                                                                                                                     |
-| ---------------------------- | -------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `token`                      | No       | -                                             | GitHub token for pushing images to GHCR and Trivy authentication. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                             |
-| `build-args`                 | No       | -                                             | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
-| `context`                    | No       | `.`                                           | Directory containing the Dockerfile and build context                                                                                                                                           |
-| `images`                     | No       | `ghcr.io/${{ github.repository }}`            | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
-| `push-to-container-registry` | No       | `ghcr`                                        | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                   |
-| `dockerhub-username`         | No       | -                                             | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
-| `dockerhub-token`            | No       | -                                             | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
-| `dockle-accept-key`          | No       | -                                             | Comma-separated list of package names to exclude from Dockle secret detection. Use for known false positives (see [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)) |
-| `grype-version`              | No       | latest                                        | Specific version of Grype to use for vulnerability scanning                                                                                                                                     |
-| `trivy-action-db`            | No       | `public.ecr.aws/aquasecurity/trivy-db:2`      | OCI repository for Trivy vulnerability database                                                                                                                                                 |
-| `trivy-action-java-db`       | No       | `public.ecr.aws/aquasecurity/trivy-java-db:1` | OCI repository for Trivy Java vulnerability database                                                                                                                                            |
+| Parameter                    | Required | Default                            | Description                                                                                                                                                                                     |
+| ---------------------------- | -------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`                      | No       | -                                  | GitHub token for pushing images to GHCR. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                                                      |
+| `build-args`                 | No       | -                                  | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
+| `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
+| `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
+| `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
+| `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
+| `dockerhub-token`            | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
+| `dockle-accept-key`          | No       | -                                  | Comma-separated list of package names to exclude from Dockle secret detection. Use for known false positives (see [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)) |
+| `grype-version`              | No       | latest                             | Specific version of Grype to use for vulnerability scanning                                                                                                                                     |
 
 ## Security Scanning
 
@@ -198,14 +183,6 @@ This action employs a defense-in-depth approach with multiple security scanners:
 - **Image Scan**: Scans the built Docker image for vulnerabilities
   - Severity cutoff: HIGH
   - Reports unfixed vulnerabilities
-
-### Trivy Scanning
-
-- Scans the built image with focus on critical vulnerabilities
-- Severity levels: CRITICAL and HIGH
-- Only reports vulnerabilities with available fixes (`ignore-unfixed: true`)
-- Supports custom vulnerability database sources
-- Respects `.trivyignore` file for known exceptions
 
 ### Dockle Linting
 
@@ -222,11 +199,11 @@ Images are automatically pushed to the configured container registry **only when
 2. The push is to a Git tag (matches `refs/tags/*`)
 3. The `push-to-container-registry` input is set to `ghcr` or `dockerhub`
 
-| Registry | `push-to-container-registry` | `images` override needed? | Credentials |
-|----------|------------------------------|---------------------------|-------------|
-| GHCR     | `ghcr` (default)             | No                        | `token` (GITHUB_TOKEN) |
-| Docker Hub | `dockerhub`               | Yes (e.g., `my-org/my-app`) | `dockerhub-username` + `dockerhub-token` |
-| None     | `""`                         | -                         | - |
+| Registry   | `push-to-container-registry` | `images` override needed?   | Credentials                              |
+| ---------- | ---------------------------- | --------------------------- | ---------------------------------------- |
+| GHCR       | `ghcr` (default)             | No                          | `token` (GITHUB_TOKEN)                   |
+| Docker Hub | `dockerhub`                  | Yes (e.g., `my-org/my-app`) | `dockerhub-username` + `dockerhub-token` |
+| None       | `""`                         | -                           | -                                        |
 
 This ensures images are only published for tagged releases, keeping your registry clean and organized.
 
@@ -284,12 +261,6 @@ build-args: |
   ARG1=value1
   ARG2=value2
 ```
-
-### Trivy Database Connection Issues
-
-**Problem**: Trivy fails to download vulnerability databases.
-
-**Solution**: Use custom database locations with `trivy-action-db` and `trivy-action-java-db` inputs, pointing to accessible OCI repositories.
 
 ## Contributing
 

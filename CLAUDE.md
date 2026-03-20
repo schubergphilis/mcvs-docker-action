@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerability Scanner (MCVS). It provides a comprehensive Docker image security and quality validation pipeline. This is not a traditional application with source code - it's a GitHub Action defined entirely in `action.yml`.
 
 **Key files**:
+
 - `action.yml`: The complete action definition (inputs, steps, logic)
 - `README.md`: Comprehensive user documentation with examples
 - `CLAUDE.md`: This file - guidance for Claude Code
@@ -25,29 +26,34 @@ The action executes a sequential pipeline defined in `action.yml` (lines 55-178)
 6. **Waste Detection** (dive) - Analyzes image layers for efficiency
 7. **Code Scanning** (anchore/scan-action with Grype) - Scans source code context for vulnerabilities
 8. **Image Scanning** (anchore/scan-action with Grype) - Scans built image for vulnerabilities
-9. **Trivy Scanning** (aquasecurity/trivy-action) - Additional image vulnerability scanning
-10. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
-11. **Registry Push** (docker push) - Pushes to configured registry on tag push events
+9. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
+10. **Registry Push** (docker push) - Pushes to configured registry on tag push events
 
 ## Key Design Patterns
 
 ### Build Arguments Handling
+
 The action uses a special parsing step (action.yml:68-83) to support two input formats:
+
 - Single-line: automatically formatted as `APPLICATION=value`
 - Multiline: passed through as-is to support multiple build arguments
 
 ### Security Tool Integration
+
 Three vulnerability scanners are used with different focuses:
+
 - **Grype**: Used twice - once for code scanning (action.yml:114-120), once for image scanning (action.yml:121-128)
-- **Trivy**: Additional image scanning with configurable DB sources (action.yml:129-142)
 - **Dockle**: CIS Docker benchmark compliance with known ignores (action.yml:95-104)
 
 ### Conditional Push Logic
+
 Login steps are conditional on the registry selection (action.yml:157-169):
+
 - GHCR login: runs when `push-to-container-registry == 'ghcr'`
 - Docker Hub login: runs when `push-to-container-registry == 'dockerhub'`
 
 Images are only pushed when all conditions are met (action.yml:170-177):
+
 - Event is a push (not PR)
 - Reference contains `refs/tags/` (tagged release)
 - Input `push-to-container-registry` is not empty (supports both `ghcr` and `dockerhub`)
@@ -61,6 +67,7 @@ Since this is a GitHub Action, testing means:
 3. Example test workflow pattern from README.md (lines 18-47)
 
 To test local changes before pushing:
+
 - Reference the action using the current branch: `schubergphilis/mcvs-docker-action@feature-branch`
 - Or use a local path in a workflow: `uses: ./` (when the workflow is in the same repo)
 
@@ -69,14 +76,14 @@ To test local changes before pushing:
 - `images`: Default is `ghcr.io/${{ github.repository }}`. Override when using Docker Hub (e.g., `my-org/my-app`), custom image names, or matrix builds with suffixes.
 - `build-args`: Supports both single-line (auto-formatted as `APPLICATION=value`) and multiline (passed as-is) formats.
 - `dockle-accept-key`: Workaround for false positives when specific package versions trigger Dockle's secret detection (see goodwithtech/dockle#250).
-- `trivy-action-db` and `trivy-action-java-db`: Allow using alternative OCI repositories for vulnerability databases.
 - `push-to-container-registry`: Set to `ghcr` (default), `dockerhub`, or empty string `""` to disable pushing entirely.
 - `dockerhub-username` and `dockerhub-token`: Required when `push-to-container-registry` is `dockerhub`. Typically sourced from `${{ secrets.DOCKERHUB_USERNAME }}` and `${{ secrets.DOCKERHUB_TOKEN }}`.
-- `token`: Required for pushing to GHCR and Trivy authentication. Typically `${{ secrets.GITHUB_TOKEN }}`.
+- `token`: Required for pushing to GHCR authentication. Typically `${{ secrets.GITHUB_TOKEN }}`.
 
 ## Common Modification Patterns
 
 ### Adding a New Input
+
 1. Add input definition to `action.yml` inputs section with description and optional default
 2. Use the input in the appropriate step with `${{ inputs.input-name }}`
 3. Update README.md input parameters table
@@ -84,6 +91,7 @@ To test local changes before pushing:
 5. Update CLAUDE.md Important Inputs section if there are special considerations
 
 ### Adding a New Security Tool
+
 1. Add new step in the appropriate section of action.yml:46-159
 2. Consider placement in the pipeline (static analysis before build, dynamic after)
 3. Add description to README.md Features section
@@ -91,12 +99,14 @@ To test local changes before pushing:
 5. Update CLAUDE.md Action Architecture section with step number and purpose
 
 ### Modifying Scanner Configuration
+
 1. Update the relevant step in action.yml
 2. Document the change in README.md Security Scanning section
 3. If behavior changes significantly, add to README.md Troubleshooting section
 4. Update CLAUDE.md if the design pattern or rationale changes
 
 ### Changing Push Behavior
+
 1. Modify the conditional in action.yml:153-156
 2. Update README.md Image Push Behavior section with new conditions
 3. Add troubleshooting entry if the change might confuse users
@@ -109,6 +119,7 @@ Dependabot is configured to update all GitHub Actions weekly in a single grouped
 ## Ignored Security Checks
 
 Two Dockle CIS checks are permanently ignored (action.yml:98-102):
+
 - **CIS-DI-0005**: Content trust - not achievable on public GitHub runners
 - **CIS-DI-0006**: HEALTHCHECK - intentionally left to action consumers to implement
 
@@ -119,18 +130,21 @@ The repository uses `schubergphilis/mcvs-pr-validation-action` on all PRs (`.git
 ## Documentation Conventions
 
 ### README.md
+
 - User-facing documentation with comprehensive examples
 - Should include: quick start, usage examples, input parameters table, troubleshooting
 - Examples should be copy-paste ready and demonstrate common use cases
 - Keep technical details balanced - enough to understand but not overwhelming
 
 ### CLAUDE.md
+
 - Technical reference for Claude Code
 - Should include: architecture details, design patterns, line number references to code
 - Focus on "why" decisions were made, not just "what" the code does
 - Update when adding new features or changing architectural patterns
 
 ### Keeping Docs in Sync
+
 - When adding new inputs to action.yml, update both README.md (user table) and CLAUDE.md (technical notes if needed)
 - When changing behavior, update README.md examples and CLAUDE.md design patterns section
 - README.md is the source of truth for user documentation
