@@ -49,7 +49,7 @@ runs:
     #
     # Dockerfile linting (static).
     #
-    - uses: hadolint/hadolint-action@v3.3.0
+    - uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
@@ -58,7 +58,7 @@ runs:
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
-      uses: docker/metadata-action@v6.0.0
+      uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
       with:
         flavor: |
           latest=false
@@ -85,7 +85,7 @@ runs:
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@v7.0.0
+      uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
@@ -95,7 +95,7 @@ runs:
     #
     # Docker image linting (dynamic).
     #
-    - uses: goodwithtech/dockle-action@v0.4.15
+    - uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
       with:
         image: ${{ steps.meta.outputs.tags }}
         # CIS-DI-0005: Enable Content trust for Docker as this cannot be
@@ -108,7 +108,7 @@ runs:
     #
     # Detect waste in the docker image.
     #
-    - uses: docker://wagoodman/dive:v0.13.1
+    - uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
       with:
         args: ${{ steps.meta.outputs.tags }} --ci
     #
@@ -134,14 +134,14 @@ runs:
     #
     - name: Log in to GitHub Container Registry
       if: inputs.push-to-container-registry == 'ghcr'
-      uses: docker/login-action@v4.0.0
+      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Log in to Docker Hub
       if: inputs.push-to-container-registry == 'dockerhub'
-      uses: docker/login-action@v4.0.0
+      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
