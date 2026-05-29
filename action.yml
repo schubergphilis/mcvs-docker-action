@@ -58,7 +58,7 @@ runs:
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
-      uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6.0.0
+      uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
       with:
         flavor: |
           latest=false
@@ -85,7 +85,7 @@ runs:
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
     - name: Build an image from a dockerfile
-      uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+      uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
@@ -134,14 +134,14 @@ runs:
     #
     - name: Log in to GitHub Container Registry
       if: inputs.push-to-container-registry == 'ghcr'
-      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Log in to Docker Hub
       if: inputs.push-to-container-registry == 'dockerhub'
-      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
