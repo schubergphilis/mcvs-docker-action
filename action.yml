@@ -110,7 +110,7 @@ runs:
     #
     - uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
       with:
-        args: ${{ steps.meta.outputs.tags }} --ci
+        args: ${{ steps.meta.outputs.tags }} --ci --ci-config .dive-ci
     #
     # Code and docker image security scanning.
     #
