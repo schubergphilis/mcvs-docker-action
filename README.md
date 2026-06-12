@@ -184,6 +184,23 @@ This action employs a defense-in-depth approach with multiple security scanners:
   - Severity cutoff: HIGH
   - Reports unfixed vulnerabilities
 
+### Dive Efficiency Analysis
+
+- Analyzes image layers for wasted space
+- Runs in CI mode (`--ci`) and reads thresholds from a `.dive-ci` file in your
+  repository root when present
+- Example `.dive-ci` configuration:
+
+```yaml
+rules:
+  lowestEfficiency: 0.95
+  highestWastedBytes: 20MB
+  highestUserWastedPercent: 0.20
+```
+
+See the [Dive CI documentation](https://github.com/wagoodman/dive#ci-integration)
+for all available options.
+
 ### Dockle Linting
 
 - Validates CIS Docker benchmarks
