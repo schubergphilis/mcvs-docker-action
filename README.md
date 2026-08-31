@@ -1,7 +1,9 @@
-# MCVS-docker-action
+# MCVS Docker Action
 
 [![GitHub release](https://img.shields.io/github/v/release/schubergphilis/mcvs-docker-action)](https://github.com/schubergphilis/mcvs-docker-action/releases)
 [![License](https://img.shields.io/github/license/schubergphilis/mcvs-docker-action)](LICENSE)
+
+<img src="./assets/logos/mcvs-docker-action.png" width="250"></a>
 
 Mission Critical Vulnerability Scanner (MCVS) Docker Action is a comprehensive GitHub Action that provides a complete Docker image security and quality validation pipeline. This action combines multiple industry-standard tools to ensure your Docker images meet security and quality standards before deployment.
 
