@@ -145,6 +145,65 @@ alpine`, as hadolint rejects that with
 `--platform` to Buildx, which provides `BUILDPLATFORM`, `TARGETPLATFORM`,
 `TARGETOS` and `TARGETARCH` to the build.
 
+#### Building the Architectures in Parallel
+
+The example above builds both architectures in one job, where `linux/arm64` is
+emulated with QEMU. To build them at the same time instead, give each platform
+its own job. GitHub runs those jobs in parallel, and each of them can pick a
+runner that matches its architecture, so no emulation is needed at all.
+
+A manifest list cannot be assembled from jobs that each push the same tag, as
+the last job would simply overwrite the others. Each job therefore pushes its
+image **by digest**, and a merge job combines the digests into one manifest
+list:
+
+```yaml
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: schubergphilis/mcvs-docker-action@v0.1.0
+        with:
+          platforms: ${{ matrix.platform }}
+          push-by-digest: "true"
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  merge:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: schubergphilis/mcvs-docker-action/merge@v0.1.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+Each build job runs the complete pipeline for its own platform, i.e. hadolint,
+the build, Dockle, Dive and Grype. The merge job only runs on a tagged push and
+is a no-op otherwise, so the same workflow works for pull requests.
+
+Note that:
+
+- `push-by-digest` requires exactly one platform and one image name per job, as
+  a job produces exactly one digest. The action fails with an explicit message
+  otherwise.
+- Every build job and the merge job need `packages: write` for GHCR.
+- All build jobs have to target the same `images` value, since the merge job
+  collects every digest artifact of the run.
+- This is optional. The single job example above keeps working unchanged and
+  needs no matrix.
+
 ### Custom Dockerfile Location
 
 If your Dockerfile is not in the repository root:
@@ -201,6 +260,7 @@ Build and scan without pushing to any registry:
 | `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
 | `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
 | `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds                                                                                      |
+| `push-by-digest`             | No       | `false`                            | Push without a tag so a matrix of one job per platform can be merged into one manifest list by the `merge` action. Requires exactly one platform and one image name                             |
 | `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
 | `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
 | `dockerhub-token`            | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |

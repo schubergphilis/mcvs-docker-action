@@ -5,6 +5,7 @@ name: MCVS-docker-action
 permissions:
   contents: read
 jobs:
+  # the default, i.e. every platform in a single job
   MCVS-docker-action:
     strategy:
       matrix:
@@ -20,4 +21,32 @@ jobs:
         with:
           context: test
           platforms: ${{ matrix.args.platforms }}
+          push-to-container-registry: ""
+  # one job per platform, which is what the documented matrix relies on
+  MCVS-docker-action-per-platform:
+    strategy:
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./
+        with:
+          context: test
+          platforms: ${{ matrix.platform }}
+          push-to-container-registry: ""
+  # the merge action is a no-op outside a tagged push
+  MCVS-docker-action-merge:
+    needs: MCVS-docker-action-per-platform
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./merge
+        with:
           push-to-container-registry: ""
