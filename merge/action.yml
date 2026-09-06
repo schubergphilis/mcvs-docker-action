@@ -5,7 +5,9 @@ name: MCVS-docker-action-merge
 description: |
   Combine the images that the MCVS-docker-action has pushed by digest into a
   single manifest list. Run this in a job that needs the jobs which have run
-  the MCVS-docker-action with `push-by-digest: "true"`.
+  the MCVS-docker-action with `push-by-digest: "true"`, and gate that job with
+  `if: startsWith(github.ref, 'refs/tags/')` as the images are only pushed for
+  a tagged release.
 inputs:
   images:
     description: The name of the created image.
@@ -33,36 +35,15 @@ runs:
   using: "composite"
   steps:
     #
-    # The push conditions of the mcvs-docker-action are evaluated once and
-    # reused by every step below, so that this action is a no-op instead of a
-    # failure when the images have not been pushed at all.
-    #
-    - name: Determine whether a manifest list has to be pushed
-      id: guard
-      shell: bash
-      env:
-        EVENT_NAME: ${{ github.event_name }}
-        REF: ${{ github.ref }}
-        REGISTRY: ${{ inputs.push-to-container-registry }}
-      run: |
-        if [[ "$EVENT_NAME" == "push" && "$REF" == *"refs/tags/"* && -n "$REGISTRY" ]]; then
-          echo "push=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "push=false" >> "$GITHUB_OUTPUT"
-          echo "Not a tagged push or pushing is disabled, no manifest list is created."
-        fi
-    #
     # Collect the digest of every platform that has been built.
     #
     - name: Download the digests
-      if: steps.guard.outputs.push == 'true'
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         merge-multiple: true
         path: ${{ runner.temp }}/digests
         pattern: mcvs-docker-action-digest-*
     - name: Set up Docker Buildx
-      if: steps.guard.outputs.push == 'true'
       uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
     #
     # The same metadata configuration as the mcvs-docker-action, so that the
@@ -71,7 +52,6 @@ runs:
     #
     - name: Extract metadata (tags, labels) for Docker
       id: meta
-      if: steps.guard.outputs.push == 'true'
       uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
       with:
         flavor: |
@@ -81,24 +61,19 @@ runs:
     # Log in to the container registry and push the manifest list.
     #
     - name: Log in to GitHub Container Registry
-      if: |
-        steps.guard.outputs.push == 'true' &&
-        inputs.push-to-container-registry == 'ghcr'
+      if: inputs.push-to-container-registry == 'ghcr'
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Log in to Docker Hub
-      if: |
-        steps.guard.outputs.push == 'true' &&
-        inputs.push-to-container-registry == 'dockerhub'
+      if: inputs.push-to-container-registry == 'dockerhub'
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
     - name: Create the manifest list and push it
-      if: steps.guard.outputs.push == 'true'
       shell: bash
       env:
         IMAGES: ${{ inputs.images }}
@@ -106,21 +81,15 @@ runs:
         VERSION: ${{ steps.meta.outputs.version }}
       working-directory: ${{ runner.temp }}/digests
       run: |
-        references=()
-        for digest in *; do
-          if [[ ! -f "$digest" ]]; then
-            echo "::error::no digests found, did the build jobs run with push-by-digest?"
-            exit 1
-          fi
-          references+=("${IMAGES}@sha256:${digest}")
-        done
+        shopt -s nullglob
+        digests=(*)
+        if [[ ${#digests[@]} -eq 0 ]]; then
+          echo "::error::no digests found, did the build jobs run with push-by-digest?"
+          exit 1
+        fi
+        references=("${digests[@]/#/${IMAGES}@sha256:}")
 
-        tags=()
-        while IFS= read -r tag; do
-          if [[ -n "$tag" ]]; then
-            tags+=(--tag "$tag")
-          fi
-        done < <(jq -r '.tags[]' <<< "$METADATA")
+        mapfile -t tags < <(jq -r '.tags[] | "--tag", .' <<< "$METADATA")
 
         docker buildx imagetools create "${tags[@]}" "${references[@]}"
         docker buildx imagetools inspect "${IMAGES}:${VERSION}"

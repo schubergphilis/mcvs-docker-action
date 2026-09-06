@@ -38,8 +38,8 @@ inputs:
     description: |
       Comma separated list of target platforms to build the image for, e.g.
       `linux/amd64,linux/arm64`. Set the value to `linux/amd64` to restore
-      single architecture builds. Only `linux/amd64` and `linux/arm64` images
-      are scanned.
+      single architecture builds. One platform is scanned per job, i.e.
+      `linux/amd64` when it is in the list, else the first entry.
     default: linux/amd64,linux/arm64
   push-by-digest:
     description: |
@@ -79,7 +79,13 @@ runs:
       uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-    - name: Validate the platforms and warn about the ones that are not scanned
+    #
+    # Only one image can be loaded into the docker image store, hence a single
+    # platform is picked to lint, detect waste in and scan. linux/amd64 is
+    # preferred as it requires no emulation, which means that a matrix with one
+    # job per platform scans every platform that it builds.
+    #
+    - name: Determine the platform to scan and validate the inputs
       id: validate
       shell: bash
       env:
@@ -87,38 +93,32 @@ runs:
         PLATFORMS: ${{ inputs.platforms }}
         PUSH_BY_DIGEST: ${{ inputs.push-by-digest }}
       run: |
-        platform_count=0
-        platform_slug=""
-        IFS=',' read -ra parsed_platforms <<< "$PLATFORMS"
-        for platform in "${parsed_platforms[@]}"; do
-          platform="$(echo "$platform" | xargs)"
-          if [[ -z "$platform" ]]; then
-            continue
-          fi
-          platform_count=$((platform_count + 1))
-          platform_slug="${platform//\//-}"
-          if [[ "$platform" != "linux/amd64" && "$platform" != "linux/arm64" ]]; then
+        read -ra platforms <<< "${PLATFORMS//,/ }"
+        scan_platform="${platforms[0]}"
+        if [[ " ${platforms[*]} " == *" linux/amd64 "* ]]; then
+          scan_platform="linux/amd64"
+        fi
+        for platform in "${platforms[@]}"; do
+          [[ "$platform" == "$scan_platform" ]] ||
             echo "::warning::platform ${platform} is built and pushed, but not scanned by Dockle, Dive and Grype"
-          fi
         done
 
         # a digest push results in one digest per job, which the merge action
         # combines into a manifest list, hence a job may only handle one
         # platform and one image
         if [[ "$PUSH_BY_DIGEST" == "true" ]]; then
-          if [[ "$platform_count" -ne 1 ]]; then
+          if [[ "$PLATFORMS" == *,* ]]; then
             echo "::error::push-by-digest requires exactly one platform, got: ${PLATFORMS}"
             exit 1
           fi
-
-          image_count="$(echo "$IMAGES" | tr ',' '\n' | sed '/^[[:space:]]*$/d' | wc -l)"
-          if [[ "$image_count" -ne 1 ]]; then
+          if [[ "$IMAGES" == *,* || "$IMAGES" == *$'\n'* ]]; then
             echo "::error::push-by-digest requires exactly one image name, got: ${IMAGES}"
             exit 1
           fi
         fi
 
-        echo "platform_slug=${platform_slug}" >> "$GITHUB_OUTPUT"
+        echo "platform_slug=${scan_platform//\//-}" >> "$GITHUB_OUTPUT"
+        echo "scan_platform=${scan_platform}" >> "$GITHUB_OUTPUT"
     #
     # Determine image name and tag.
     #
@@ -151,27 +151,27 @@ runs:
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
     #
-    # Build, lint (dynamic), detect waste in and scan the linux/amd64 image.
-    # A per platform local tag is used as both images have to coexist in the
-    # docker image store. Loading a non native image is fine as Dockle, Dive
-    # and Grype inspect the layers and config, they never execute the image.
+    # Build, lint (dynamic), detect waste in and scan the image. Loading a non
+    # native image is fine as Dockle, Dive and Grype inspect the layers and the
+    # config, they never execute the image. steps.meta.outputs.tags is not used
+    # as the local tag since it can be multiline.
     #
-    - name: Build a linux/amd64 image from a dockerfile
-      if: contains(inputs.platforms, 'linux/amd64')
+    - name: Build an image from a dockerfile
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
         load: true
-        platforms: linux/amd64
+        platforms: ${{ steps.validate.outputs.scan_platform }}
         push: false
-        tags: mcvs-docker-action:scan-linux-amd64
-    - name: Lint the linux/amd64 image using Dockle
-      if: contains(inputs.platforms, 'linux/amd64')
-      uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
+        tags: mcvs-docker-action:scan
+    #
+    # Docker image linting (dynamic).
+    #
+    - uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
       with:
-        image: mcvs-docker-action:scan-linux-amd64
+        image: mcvs-docker-action:scan
         # CIS-DI-0005: Enable Content trust for Docker as this cannot be
         # achieved in public GitHub runners.
         # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
@@ -179,57 +179,17 @@ runs:
         # to set a health check or not.
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
-    - name: Detect waste in the linux/amd64 image using Dive
-      if: contains(inputs.platforms, 'linux/amd64')
-      uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
+    #
+    # Detect waste in the docker image.
+    #
+    - uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
       with:
-        args: mcvs-docker-action:scan-linux-amd64 --ci --ci-config .dive-ci
-    - name: Scan the linux/amd64 image using Grype
-      if: contains(inputs.platforms, 'linux/amd64')
+        args: mcvs-docker-action:scan --ci --ci-config .dive-ci
+    - name: Scan the image using Grype
       uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
       with:
         grype-version: ${{ inputs.grype-version }}
-        image: mcvs-docker-action:scan-linux-amd64
-        only-fixed: false
-        output-format: table
-        severity-cutoff: high
-    #
-    # Build, lint (dynamic), detect waste in and scan the linux/arm64 image.
-    #
-    - name: Build a linux/arm64 image from a dockerfile
-      if: contains(inputs.platforms, 'linux/arm64')
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-      with:
-        build-args: ${{ steps.parse.outputs.build_args }}
-        context: ${{ inputs.context }}
-        labels: ${{ steps.meta.outputs.labels }}
-        load: true
-        platforms: linux/arm64
-        push: false
-        tags: mcvs-docker-action:scan-linux-arm64
-    - name: Lint the linux/arm64 image using Dockle
-      if: contains(inputs.platforms, 'linux/arm64')
-      uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
-      with:
-        image: mcvs-docker-action:scan-linux-arm64
-        # CIS-DI-0005: Enable Content trust for Docker as this cannot be
-        # achieved in public GitHub runners.
-        # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
-        # the decision was made that this is up to the consumer of this action
-        # to set a health check or not.
-        ignore: CIS-DI-0005,CIS-DI-0006
-        accept-key: ${{ inputs.dockle-accept-key }}
-    - name: Detect waste in the linux/arm64 image using Dive
-      if: contains(inputs.platforms, 'linux/arm64')
-      uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
-      with:
-        args: mcvs-docker-action:scan-linux-arm64 --ci --ci-config .dive-ci
-    - name: Scan the linux/arm64 image using Grype
-      if: contains(inputs.platforms, 'linux/arm64')
-      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
-      with:
-        grype-version: ${{ inputs.grype-version }}
-        image: mcvs-docker-action:scan-linux-arm64
+        image: mcvs-docker-action:scan
         only-fixed: false
         output-format: table
         severity-cutoff: high
@@ -306,11 +266,7 @@ runs:
         platforms: ${{ inputs.platforms }}
         provenance: false
     - name: Export the digest
-      if: |
-        github.event_name == 'push' &&
-        contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry != '' &&
-        inputs.push-by-digest == 'true'
+      if: steps.digest.outputs.digest != ''
       shell: bash
       env:
         DIGEST: ${{ steps.digest.outputs.digest }}
@@ -318,11 +274,7 @@ runs:
         mkdir -p "${RUNNER_TEMP}/digests"
         touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
     - name: Upload the digest
-      if: |
-        github.event_name == 'push' &&
-        contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry != '' &&
-        inputs.push-by-digest == 'true'
+      if: steps.digest.outputs.digest != ''
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         if-no-files-found: error

@@ -19,7 +19,6 @@ This action provides a complete CI/CD pipeline for Docker images with the follow
 - **Efficiency Analysis**: Layer-by-layer waste detection using [Dive](https://github.com/wagoodman/dive)
 - **Multi-Scanner Security**: Triple-layer security scanning with:
   - **Grype**: Scans both source code and built images for vulnerabilities
-  - **Per architecture**: the image linter, the efficiency analysis and the image scan run once for every built architecture
 - **Automated Registry Push**: Conditional push to GitHub Container Registry or Docker Hub on tagged releases
 
 ## Quick Start
@@ -116,8 +115,8 @@ jobs:
 
 ### Multi-Architecture Builds
 
-By default the action builds, scans and pushes both `linux/amd64` and
-`linux/arm64`. No configuration is required:
+By default the action builds and pushes both `linux/amd64` and `linux/arm64`.
+No configuration is required:
 
 ```yaml
 - uses: schubergphilis/mcvs-docker-action@v0.1.0
@@ -135,9 +134,14 @@ releases slower. To build a single architecture instead:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Additional platforms, e.g. `linux/arm/v7`, can be added to the list. They are
-built and pushed, but only `linux/amd64` and `linux/arm64` images are scanned by
-Dockle, Dive and Grype; a warning is emitted for the platforms that are not.
+Only one image can be loaded into the local Docker image store, so Dockle, Dive
+and Grype scan a single platform per job: `linux/amd64` when it is in the list,
+otherwise the first entry. A warning is emitted for every platform that is built
+but not scanned. To scan every architecture, give each one its own job as
+described below.
+
+Additional platforms, e.g. `linux/arm/v7`, can be added to the list and are
+built and pushed like any other.
 
 Do not hardcode a platform in the Dockerfile, e.g. `FROM --platform=linux/amd64
 alpine`, as hadolint rejects that with
@@ -179,6 +183,7 @@ jobs:
 
   merge:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -190,11 +195,15 @@ jobs:
 ```
 
 Each build job runs the complete pipeline for its own platform, i.e. hadolint,
-the build, Dockle, Dive and Grype. The merge job only runs on a tagged push and
-is a no-op otherwise, so the same workflow works for pull requests.
+the build, Dockle, Dive and Grype. Every platform is therefore scanned in this
+shape, whereas the single job example above scans `linux/amd64` only.
 
 Note that:
 
+- The merge job has to be gated with `if: startsWith(github.ref,
+  'refs/tags/')`, since there is nothing to merge unless the build jobs have
+  pushed. The build jobs themselves need no `if`, they run their scans on a
+  pull request and only skip the push.
 - `push-by-digest` requires exactly one platform and one image name per job, as
   a job produces exactly one digest. The action fails with an explicit message
   otherwise.
@@ -259,7 +268,7 @@ Build and scan without pushing to any registry:
 | `build-args`                 | No       | -                                  | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
 | `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
 | `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
-| `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds                                                                                      |
+| `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds. One platform is scanned per job                                                     |
 | `push-by-digest`             | No       | `false`                            | Push without a tag so a matrix of one job per platform can be merged into one manifest list by the `merge` action. Requires exactly one platform and one image name                             |
 | `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
 | `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
@@ -279,11 +288,11 @@ This action employs a defense-in-depth approach with multiple security scanners:
 - **Image Scan**: Scans the built Docker image for vulnerabilities
   - Severity cutoff: HIGH
   - Reports unfixed vulnerabilities
-  - Runs once per built architecture (`linux/amd64` and `linux/arm64`)
+  - Runs once per job, against the scanned platform
 
 ### Dive Efficiency Analysis
 
-- Analyzes image layers for wasted space, once per built architecture
+- Analyzes image layers for wasted space
 - Runs in CI mode (`--ci`) and reads thresholds from a `.dive-ci` file in your
   repository root when present
 - Example `.dive-ci` configuration:
@@ -300,7 +309,7 @@ for all available options.
 
 ### Dockle Linting
 
-- Validates CIS Docker benchmarks, once per built architecture
+- Validates CIS Docker benchmarks
 - Permanently ignores:
   - `CIS-DI-0005`: Content trust (not achievable on public runners)
   - `CIS-DI-0006`: HEALTHCHECK (left to consumer discretion)
@@ -359,18 +368,6 @@ See [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)
 4. Wrong registry: Ensure `push-to-container-registry` matches your intended registry (`ghcr` or `dockerhub`)
 5. Docker Hub credentials: When using `dockerhub`, ensure both `dockerhub-username` and `dockerhub-token` are provided
 6. Image name mismatch: When using Docker Hub, override `images` to match your Docker Hub repository (e.g., `my-org/my-app`)
-
-### Tagged Releases Became Slower
-
-**Problem**: The workflow takes considerably longer since multi-architecture builds were introduced.
-
-**Cause**: `linux/arm64` is built on an `amd64` runner through QEMU emulation, which is slow for compilation heavy Dockerfiles. The image is also linted, analysed and scanned for both architectures.
-
-**Solution**: Restrict the build to a single architecture:
-
-```yaml
-platforms: linux/amd64
-```
 
 ### hadolint DL3029: Do Not Use --platform Flag with FROM
 
