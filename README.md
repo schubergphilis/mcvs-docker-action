@@ -13,11 +13,13 @@ This action provides a complete CI/CD pipeline for Docker images with the follow
 
 - **Dockerfile Linting**: Static analysis using [hadolint](https://github.com/hadolint/hadolint) to enforce best practices
 - **Automated Tagging**: Smart image tagging based on Git context (branches, tags, commits)
+- **Multi-Architecture Builds**: `linux/amd64` and `linux/arm64` images are built with [Buildx](https://docs.docker.com/build/) and published as a single manifest list
 - **Image Building**: Efficient Docker image building with support for build arguments
 - **Image Linting**: CIS Docker benchmark compliance checking using [Dockle](https://github.com/goodwithtech/dockle)
 - **Efficiency Analysis**: Layer-by-layer waste detection using [Dive](https://github.com/wagoodman/dive)
 - **Multi-Scanner Security**: Triple-layer security scanning with:
   - **Grype**: Scans both source code and built images for vulnerabilities
+  - **Per architecture**: the image linter, the efficiency analysis and the image scan run once for every built architecture
 - **Automated Registry Push**: Conditional push to GitHub Container Registry or Docker Hub on tagged releases
 
 ## Quick Start
@@ -112,6 +114,37 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+### Multi-Architecture Builds
+
+By default the action builds, scans and pushes both `linux/amd64` and
+`linux/arm64`. No configuration is required:
+
+```yaml
+- uses: schubergphilis/mcvs-docker-action@v0.1.0
+  with:
+    token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+The `linux/arm64` image is built through QEMU emulation, which makes tagged
+releases slower. To build a single architecture instead:
+
+```yaml
+- uses: schubergphilis/mcvs-docker-action@v0.1.0
+  with:
+    platforms: linux/amd64
+    token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+Additional platforms, e.g. `linux/arm/v7`, can be added to the list. They are
+built and pushed, but only `linux/amd64` and `linux/arm64` images are scanned by
+Dockle, Dive and Grype; a warning is emitted for the platforms that are not.
+
+Do not hardcode a platform in the Dockerfile, e.g. `FROM --platform=linux/amd64
+alpine`, as hadolint rejects that with
+[DL3029](https://github.com/hadolint/hadolint/wiki/DL3029). The action passes
+`--platform` to Buildx, which provides `BUILDPLATFORM`, `TARGETPLATFORM`,
+`TARGETOS` and `TARGETARCH` to the build.
+
 ### Custom Dockerfile Location
 
 If your Dockerfile is not in the repository root:
@@ -167,6 +200,7 @@ Build and scan without pushing to any registry:
 | `build-args`                 | No       | -                                  | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
 | `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
 | `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
+| `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds                                                                                      |
 | `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
 | `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
 | `dockerhub-token`            | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
@@ -185,10 +219,11 @@ This action employs a defense-in-depth approach with multiple security scanners:
 - **Image Scan**: Scans the built Docker image for vulnerabilities
   - Severity cutoff: HIGH
   - Reports unfixed vulnerabilities
+  - Runs once per built architecture (`linux/amd64` and `linux/arm64`)
 
 ### Dive Efficiency Analysis
 
-- Analyzes image layers for wasted space
+- Analyzes image layers for wasted space, once per built architecture
 - Runs in CI mode (`--ci`) and reads thresholds from a `.dive-ci` file in your
   repository root when present
 - Example `.dive-ci` configuration:
@@ -205,7 +240,7 @@ for all available options.
 
 ### Dockle Linting
 
-- Validates CIS Docker benchmarks
+- Validates CIS Docker benchmarks, once per built architecture
 - Permanently ignores:
   - `CIS-DI-0005`: Content trust (not achievable on public runners)
   - `CIS-DI-0006`: HEALTHCHECK (left to consumer discretion)
@@ -225,6 +260,8 @@ Images are automatically pushed to the configured container registry **only when
 | None       | `""`                         | -                           | -                                        |
 
 This ensures images are only published for tagged releases, keeping your registry clean and organized.
+
+A manifest list covering every platform in the `platforms` input is pushed, so consumers automatically pull the image that matches their architecture.
 
 ## Required Permissions
 
@@ -262,6 +299,30 @@ See [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)
 4. Wrong registry: Ensure `push-to-container-registry` matches your intended registry (`ghcr` or `dockerhub`)
 5. Docker Hub credentials: When using `dockerhub`, ensure both `dockerhub-username` and `dockerhub-token` are provided
 6. Image name mismatch: When using Docker Hub, override `images` to match your Docker Hub repository (e.g., `my-org/my-app`)
+
+### Tagged Releases Became Slower
+
+**Problem**: The workflow takes considerably longer since multi-architecture builds were introduced.
+
+**Cause**: `linux/arm64` is built on an `amd64` runner through QEMU emulation, which is slow for compilation heavy Dockerfiles. The image is also linted, analysed and scanned for both architectures.
+
+**Solution**: Restrict the build to a single architecture:
+
+```yaml
+platforms: linux/amd64
+```
+
+### hadolint DL3029: Do Not Use --platform Flag with FROM
+
+**Problem**: hadolint fails with [DL3029](https://github.com/hadolint/hadolint/wiki/DL3029) because a `FROM` instruction hardcodes a platform, e.g. `FROM --platform=linux/amd64 alpine`.
+
+**Solution**: Do not hardcode the platform. The action passes the target platforms to Buildx, which sets `BUILDPLATFORM`, `TARGETPLATFORM`, `TARGETOS` and `TARGETARCH` for you. Only these variables are accepted by DL3029:
+
+```dockerfile
+FROM --platform=$BUILDPLATFORM golang:1.24 AS build
+ARG TARGETOS TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /app .
+```
 
 ### Build Arguments Not Working
 

@@ -34,6 +34,13 @@ inputs:
     description: |
       Docker Hub access token. Required when push-to-container-registry is set
       to 'dockerhub'.
+  platforms:
+    description: |
+      Comma separated list of target platforms to build the image for, e.g.
+      `linux/amd64,linux/arm64`. Set the value to `linux/amd64` to restore
+      single architecture builds. Only `linux/amd64` and `linux/arm64` images
+      are scanned.
+    default: linux/amd64,linux/arm64
   push-to-container-registry:
     description: |
       Specify the container registry to which the image must be pushed. Set the
@@ -55,6 +62,31 @@ runs:
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
+    #
+    # Prepare the builder. QEMU is only required to emulate a platform that the
+    # runner does not provide natively. Buildx is always set up so that all
+    # build steps in this job share one builder and therefore one layer cache.
+    #
+    - name: Set up QEMU
+      if: inputs.platforms != 'linux/amd64'
+      uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+    - name: Warn about platforms that are built but not scanned
+      shell: bash
+      env:
+        PLATFORMS: ${{ inputs.platforms }}
+      run: |
+        IFS=',' read -ra parsed_platforms <<< "$PLATFORMS"
+        for platform in "${parsed_platforms[@]}"; do
+          platform="$(echo "$platform" | xargs)"
+          if [[ -z "$platform" ]]; then
+            continue
+          fi
+          if [[ "$platform" != "linux/amd64" && "$platform" != "linux/arm64" ]]; then
+            echo "::warning::platform ${platform} is built and pushed, but not scanned by Dockle, Dive and Grype"
+          fi
+        done
     #
     # Determine image name and tag.
     #
@@ -86,20 +118,28 @@ runs:
           echo "Detected single-line build-arg"
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
-    - name: Build an image from a dockerfile
+    #
+    # Build, lint (dynamic), detect waste in and scan the linux/amd64 image.
+    # A per platform local tag is used as both images have to coexist in the
+    # docker image store. Loading a non native image is fine as Dockle, Dive
+    # and Grype inspect the layers and config, they never execute the image.
+    #
+    - name: Build a linux/amd64 image from a dockerfile
+      if: contains(inputs.platforms, 'linux/amd64')
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
+        load: true
+        platforms: linux/amd64
         push: false
-        tags: ${{ steps.meta.outputs.tags }}
-    #
-    # Docker image linting (dynamic).
-    #
-    - uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
+        tags: mcvs-docker-action:scan-linux-amd64
+    - name: Lint the linux/amd64 image using Dockle
+      if: contains(inputs.platforms, 'linux/amd64')
+      uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
       with:
-        image: ${{ steps.meta.outputs.tags }}
+        image: mcvs-docker-action:scan-linux-amd64
         # CIS-DI-0005: Enable Content trust for Docker as this cannot be
         # achieved in public GitHub runners.
         # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
@@ -107,29 +147,70 @@ runs:
         # to set a health check or not.
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
-    #
-    # Detect waste in the docker image.
-    #
-    - uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
+    - name: Detect waste in the linux/amd64 image using Dive
+      if: contains(inputs.platforms, 'linux/amd64')
+      uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
       with:
-        args: ${{ steps.meta.outputs.tags }} --ci --ci-config .dive-ci
+        args: mcvs-docker-action:scan-linux-amd64 --ci --ci-config .dive-ci
+    - name: Scan the linux/amd64 image using Grype
+      if: contains(inputs.platforms, 'linux/amd64')
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+      with:
+        grype-version: ${{ inputs.grype-version }}
+        image: mcvs-docker-action:scan-linux-amd64
+        only-fixed: false
+        output-format: table
+        severity-cutoff: high
     #
-    # Code and docker image security scanning.
+    # Build, lint (dynamic), detect waste in and scan the linux/arm64 image.
     #
-    - uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+    - name: Build a linux/arm64 image from a dockerfile
+      if: contains(inputs.platforms, 'linux/arm64')
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      with:
+        build-args: ${{ steps.parse.outputs.build_args }}
+        context: ${{ inputs.context }}
+        labels: ${{ steps.meta.outputs.labels }}
+        load: true
+        platforms: linux/arm64
+        push: false
+        tags: mcvs-docker-action:scan-linux-arm64
+    - name: Lint the linux/arm64 image using Dockle
+      if: contains(inputs.platforms, 'linux/arm64')
+      uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
+      with:
+        image: mcvs-docker-action:scan-linux-arm64
+        # CIS-DI-0005: Enable Content trust for Docker as this cannot be
+        # achieved in public GitHub runners.
+        # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
+        # the decision was made that this is up to the consumer of this action
+        # to set a health check or not.
+        ignore: CIS-DI-0005,CIS-DI-0006
+        accept-key: ${{ inputs.dockle-accept-key }}
+    - name: Detect waste in the linux/arm64 image using Dive
+      if: contains(inputs.platforms, 'linux/arm64')
+      uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
+      with:
+        args: mcvs-docker-action:scan-linux-arm64 --ci --ci-config .dive-ci
+    - name: Scan the linux/arm64 image using Grype
+      if: contains(inputs.platforms, 'linux/arm64')
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+      with:
+        grype-version: ${{ inputs.grype-version }}
+        image: mcvs-docker-action:scan-linux-arm64
+        only-fixed: false
+        output-format: table
+        severity-cutoff: high
+    #
+    # Code security scanning. Architecture independent, hence it runs once.
+    #
+    - name: Scan the code using Grype
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
         output-format: table
         path: ${{ inputs.context }}
-        severity-cutoff: high
-    - name: Scan image using Grype
-      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
-      with:
-        grype-version: ${{ inputs.grype-version }}
-        image: ${{ steps.meta.outputs.tags }}
-        only-fixed: false
-        output-format: table
         severity-cutoff: high
     #
     # Log in to the container registry and push the image.
@@ -147,11 +228,26 @@ runs:
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
-    - name: Push Docker image
+    #
+    # A multi architecture image cannot be stored in the local docker image
+    # store, hence the manifest list is pushed by buildx instead of by
+    # `docker push`. The layers have already been built by the steps above and
+    # are reused from the shared builder cache.
+    #
+    # provenance is disabled to prevent that buildx adds attestation manifests
+    # that are displayed as `unknown/unknown` entries in a container registry.
+    #
+    - name: Build and push the image
       if: |
         github.event_name == 'push' &&
         contains(github.ref, 'refs/tags/') &&
         inputs.push-to-container-registry != ''
-      run: |
-        docker push --all-tags ${{ inputs.images }}
-      shell: bash
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      with:
+        build-args: ${{ steps.parse.outputs.build_args }}
+        context: ${{ inputs.context }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: ${{ inputs.platforms }}
+        provenance: false
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
