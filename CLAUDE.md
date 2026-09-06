@@ -9,7 +9,6 @@ MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerabili
 **Key files**:
 
 - `action.yml`: The complete action definition (inputs, steps, logic)
-- `merge/action.yml`: Second entry point that merges digests pushed by a matrix of per-platform jobs into one manifest list
 - `README.md`: Comprehensive user documentation with examples
 - `CLAUDE.md`: This file - guidance for Claude Code
 - `.github/workflows/mcvs-pr-validation.yml`: PR validation workflow
@@ -17,27 +16,27 @@ MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerabili
 
 ## Action Architecture
 
-The action executes a sequential pipeline defined in `action.yml` (lines 62-283):
+The action executes a sequential pipeline defined in `action.yml` (lines 58-220):
 
 1. **Dockerfile Linting** (hadolint) - Static analysis of Dockerfile syntax and best practices
 2. **Builder Setup** (docker/setup-qemu-action, docker/setup-buildx-action) - QEMU is only installed when `platforms != 'linux/amd64'`; buildx is always set up so all build steps share one builder and layer cache
-3. **Platform Selection and Validation** (action.yml:88-121) - Picks the platform to scan (`linux/amd64` when present, else the first entry), emits a `::warning::` for every other platform, rejects a `push-by-digest` run that names more than one platform or image, and exports `scan_platform` plus the `platform_slug` used for the digest artifact name
+3. **Platform Selection** (action.yml:82-96) - Exports `scan_platform`, i.e. `linux/amd64` when it is in `platforms` and otherwise the first entry, and emits a `::warning::` for every platform that is built but not scanned
 4. **Metadata Extraction** (docker/metadata-action) - Generates image tags and labels from Git context
 5. **Build Arguments Parsing** - Handles both single-line and multiline build-args inputs (uses env var for injection safety)
-6. **Build + Scan** (action.yml:159-195) - Runs once, against `steps.validate.outputs.scan_platform`:
+6. **Build + Scan** (action.yml:135-171) - Runs once, against `steps.platform.outputs.scan_platform`:
    - **Image Building** (docker/build-push-action) - Single-platform build with `load: true` and the fixed local tag `mcvs-docker-action:scan`
    - **Image Linting** (dockle) - Dynamic analysis of built image for CIS benchmarks
    - **Waste Detection** (dive) - Analyzes image layers for efficiency
    - **Image Scanning** (anchore/scan-action with Grype) - Scans built image for vulnerabilities
 7. **Code Scanning** (anchore/scan-action with Grype) - Scans source code context for vulnerabilities; architecture independent
 8. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
-9. **Registry Push** - On tag push events either builds all platforms and pushes a manifest list (action.yml:232-246), or, when `push-by-digest` is set, pushes without a tag and uploads the digest as an artifact for `merge/action.yml` (action.yml:253-283). The two are mutually exclusive
+9. **Registry Push** (action.yml:208-220) - On tag push events buildx builds every platform in `platforms` and pushes one manifest list
 
 ## Key Design Patterns
 
 ### Build Arguments Handling
 
-The action uses a special parsing step (action.yml:135-152) to support two input formats:
+The action uses a special parsing step (action.yml:111-128) to support two input formats:
 
 - Single-line: automatically formatted as `APPLICATION=value`
 - Multiline: passed through as-is to support multiple build arguments
@@ -48,36 +47,44 @@ The `platforms` input (default `linux/amd64,linux/arm64`) drives three things:
 
 - **Why buildx**: a multi-architecture image is a manifest list, which cannot be stored in the local Docker image store. That is why the push step is now `docker/build-push-action` with `push: true` instead of `docker push --all-tags`.
 - **Why one scan build with `load: true`**: dockle, dive and the Grype image scan all read an image from the local Docker daemon, and only one image can be loaded, so a single platform is built separately under the local tag `mcvs-docker-action:scan`. Loading a non-native image is safe because these tools inspect layers and config, they never execute the image. `steps.meta.outputs.tags` is not used for this build since it can be multiline.
-- **Why one platform is scanned rather than all of them**: composite actions cannot loop over `uses:` steps, so scanning N platforms means pasting the dockle/dive/Grype block N times - and for the same Dockerfile those three tools report the same findings per architecture, so the second copy costs a full QEMU build for no signal. `scan_platform` prefers `linux/amd64` because it needs no emulation. A consumer who does want every architecture scanned uses the matrix below, where each job scans the one platform it builds.
+- **Why one platform is scanned rather than all of them**: composite actions cannot loop over `uses:` steps, so scanning N platforms means pasting the dockle/dive/Grype block N times, and for the same Dockerfile those three tools report the same findings per architecture. `scan_platform` prefers `linux/amd64` because it needs no emulation. A consumer who does want every architecture scanned uses the scan-only matrix below, where each job scans the one platform it builds.
 
 The push build re-runs every platform, but against the same buildx builder used by the scan build, so it is a cache hit. `provenance: false` is set to keep registry contents equivalent to the previous `docker push` behaviour - without it buildx adds attestation manifests that surface as `unknown/unknown` entries in GHCR.
 
-### Matrix Builds With a Digest Merge
+### The Optional Scan-Only Matrix
 
-`platforms` accepting a single value means a consumer can already fan out one job per architecture, which GitHub runs in parallel and which allows `linux/arm64` to run on a native `ubuntu-24.04-arm` runner instead of under QEMU. What does not work in that shape is the push: jobs that each push the same tag overwrite one another and no manifest list results.
+Because `platforms` accepts a single value, a consumer can fan out one job per
+architecture, which GitHub runs in parallel and which lets `linux/arm64` use a native
+`ubuntu-24.04-arm` runner instead of QEMU. Each job then scans the platform it builds,
+so every architecture is covered without duplicating the scan block here.
 
-- **Why push by digest**: `push-by-digest=true` with `name-canonical=true` pushes an untagged image and returns its digest. Each job writes its digest to `${RUNNER_TEMP}/digests/<digest>` and uploads it as `mcvs-docker-action-digest-<platform-slug>`; the slug comes from the validation step so that matrix jobs cannot collide.
-- **Why a second action**: `merge/action.yml` is a separate entry point (`schubergphilis/mcvs-docker-action/merge@<ref>`) rather than a mode of the main action, because it shares almost no steps with it - it only downloads the digests, recomputes the tags with the same `docker/metadata-action` configuration, logs in and runs `docker buildx imagetools create`.
-- **Why the merge job is gated by the consumer**: `merge/action.yml` has no push conditions of its own. The consumer puts `if: startsWith(github.ref, 'refs/tags/')` on the merge job, which is one line in their workflow instead of a guard step plus a condition on all six steps here. The create step still fails explicitly when no digest artifacts were downloaded.
-- **Why every job scans**: because each matrix job passes a single platform, `scan_platform` resolves to that platform, so the matrix shape scans `linux/amd64` and `linux/arm64` where the single-job shape scans only `linux/amd64`.
-- **Constraints**: a job produces exactly one digest, so `push-by-digest` rejects more than one platform or image name. Every build job in a run must target the same `images` value, as the merge downloads every digest artifact of the run.
-- **Not the default**: the single-job multi-platform path is unchanged and remains what a consumer gets without any extra configuration.
+- **Why it does not push**: jobs that each push the same tag overwrite one another, so
+  no manifest list results. The documented matrix therefore sets
+  `push-to-container-registry: ""` and is a scanning aid only; the release push stays a
+  single ordinary job.
+- **Why there is no digest/merge path**: an earlier revision of this branch added
+  `push-by-digest` plus a second entry point, `merge/action.yml`, so that matrix jobs
+  could be stitched into one manifest list. It was dropped because it made
+  multi-architecture support look as though it required consumers to restructure a
+  single `uses:` step into a build matrix plus a merge job. Publishing a manifest list
+  from one job costs them nothing, which is the point. Do not reintroduce it without
+  that trade-off changing.
 
 ### Security Tool Integration
 
 Three vulnerability scanners are used with different focuses:
 
-- **Grype**: Used once for image scanning (action.yml:188-195) and once for code scanning (action.yml:199-206)
-- **Dockle**: CIS Docker benchmark compliance with known ignores (action.yml:172-181)
+- **Grype**: Used once for image scanning (action.yml:164-171) and once for code scanning (action.yml:175-182)
+- **Dockle**: CIS Docker benchmark compliance with known ignores (action.yml:148-157)
 
 ### Conditional Push Logic
 
-Login steps are conditional on the registry selection (action.yml:210-222):
+Login steps are conditional on the registry selection (action.yml:186-198):
 
 - GHCR login: runs when `push-to-container-registry == 'ghcr'`
 - Docker Hub login: runs when `push-to-container-registry == 'dockerhub'`
 
-Images are only pushed when all conditions are met (action.yml:232-246 and 253-267):
+Images are only pushed when all conditions are met (action.yml:208-212):
 
 - Event is a push (not PR)
 - Reference contains `refs/tags/` (tagged release)
@@ -102,7 +109,6 @@ To test local changes before pushing:
 - `build-args`: Supports both single-line (auto-formatted as `APPLICATION=value`) and multiline (passed as-is) formats.
 - `dockle-accept-key`: Workaround for false positives when specific package versions trigger Dockle's secret detection (see goodwithtech/dockle#250).
 - `platforms`: Comma separated target platforms, default `linux/amd64,linux/arm64`. `linux/arm64` is emulated with QEMU on the amd64 runner, which makes tagged releases noticeably slower; consumers opt out with `platforms: linux/amd64`. Exactly one platform is scanned per job.
-- `push-by-digest`: Default `"false"`. Switches the tag push for a digest push plus a digest artifact, which is what makes a matrix of per-platform jobs mergeable. Requires exactly one platform and one image name per job.
 - `push-to-container-registry`: Set to `ghcr` (default), `dockerhub`, or empty string `""` to disable pushing entirely.
 - `dockerhub-username` and `dockerhub-token`: Required when `push-to-container-registry` is `dockerhub`. Typically sourced from `${{ secrets.DOCKERHUB_USERNAME }}` and `${{ secrets.DOCKERHUB_TOKEN }}`.
 - `token`: Required for pushing to GHCR authentication. Typically `${{ secrets.GITHUB_TOKEN }}`.
@@ -119,7 +125,7 @@ To test local changes before pushing:
 
 ### Adding a New Security Tool
 
-1. Add new step in the appropriate section of action.yml:62-283
+1. Add new step in the appropriate section of action.yml:58-220
 2. Consider placement in the pipeline (static analysis before build, dynamic after)
 3. Add description to README.md Features section
 4. Add configuration details to README.md Security Scanning section
@@ -134,7 +140,7 @@ To test local changes before pushing:
 
 ### Changing Push Behavior
 
-1. Modify the conditional in action.yml:233-237
+1. Modify the conditional in action.yml:209-212
 2. Update README.md Image Push Behavior section with new conditions
 3. Add troubleshooting entry if the change might confuse users
 4. Update CLAUDE.md Conditional Push Logic section
@@ -145,7 +151,7 @@ Dependabot is configured to update all GitHub Actions weekly in a single grouped
 
 ## Ignored Security Checks
 
-Two Dockle CIS checks are permanently ignored (action.yml:175-180):
+Two Dockle CIS checks are permanently ignored (action.yml:151-156):
 
 - **CIS-DI-0005**: Content trust - not achievable on public GitHub runners
 - **CIS-DI-0006**: HEALTHCHECK - intentionally left to action consumers to implement

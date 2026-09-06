@@ -41,13 +41,6 @@ inputs:
       single architecture builds. One platform is scanned per job, i.e.
       `linux/amd64` when it is in the list, else the first entry.
     default: linux/amd64,linux/arm64
-  push-by-digest:
-    description: |
-      Push the image by digest instead of by tag, so that a matrix with one job
-      per platform can be merged into a single manifest list by the `merge`
-      action. Requires exactly one platform in `platforms` and exactly one
-      image name in `images`.
-    default: "false"
   push-to-container-registry:
     description: |
       Specify the container registry to which the image must be pushed. Set the
@@ -82,16 +75,15 @@ runs:
     #
     # Only one image can be loaded into the docker image store, hence a single
     # platform is picked to lint, detect waste in and scan. linux/amd64 is
-    # preferred as it requires no emulation, which means that a matrix with one
-    # job per platform scans every platform that it builds.
+    # preferred as it requires no emulation. A consumer that wants every
+    # architecture scanned runs this action in a matrix with one platform per
+    # job, as each job then scans the platform that it builds.
     #
-    - name: Determine the platform to scan and validate the inputs
-      id: validate
+    - name: Determine the platform to scan
+      id: platform
       shell: bash
       env:
-        IMAGES: ${{ inputs.images }}
         PLATFORMS: ${{ inputs.platforms }}
-        PUSH_BY_DIGEST: ${{ inputs.push-by-digest }}
       run: |
         read -ra platforms <<< "${PLATFORMS//,/ }"
         scan_platform="${platforms[0]}"
@@ -102,22 +94,6 @@ runs:
           [[ "$platform" == "$scan_platform" ]] ||
             echo "::warning::platform ${platform} is built and pushed, but not scanned by Dockle, Dive and Grype"
         done
-
-        # a digest push results in one digest per job, which the merge action
-        # combines into a manifest list, hence a job may only handle one
-        # platform and one image
-        if [[ "$PUSH_BY_DIGEST" == "true" ]]; then
-          if [[ "$PLATFORMS" == *,* ]]; then
-            echo "::error::push-by-digest requires exactly one platform, got: ${PLATFORMS}"
-            exit 1
-          fi
-          if [[ "$IMAGES" == *,* || "$IMAGES" == *$'\n'* ]]; then
-            echo "::error::push-by-digest requires exactly one image name, got: ${IMAGES}"
-            exit 1
-          fi
-        fi
-
-        echo "platform_slug=${scan_platform//\//-}" >> "$GITHUB_OUTPUT"
         echo "scan_platform=${scan_platform}" >> "$GITHUB_OUTPUT"
     #
     # Determine image name and tag.
@@ -163,7 +139,7 @@ runs:
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
         load: true
-        platforms: ${{ steps.validate.outputs.scan_platform }}
+        platforms: ${{ steps.platform.outputs.scan_platform }}
         push: false
         tags: mcvs-docker-action:scan
     #
@@ -233,8 +209,7 @@ runs:
       if: |
         github.event_name == 'push' &&
         contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry != '' &&
-        inputs.push-by-digest != 'true'
+        inputs.push-to-container-registry != ''
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
@@ -244,40 +219,3 @@ runs:
         provenance: false
         push: true
         tags: ${{ steps.meta.outputs.tags }}
-    #
-    # Alternatively the image is pushed without a tag, which allows a matrix
-    # with one job per platform to run the builds in parallel. The digest of
-    # each job is stored as an artifact, so that the merge action can combine
-    # them into a single manifest list afterwards.
-    #
-    - name: Build and push the image by digest
-      id: digest
-      if: |
-        github.event_name == 'push' &&
-        contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry != '' &&
-        inputs.push-by-digest == 'true'
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-      with:
-        build-args: ${{ steps.parse.outputs.build_args }}
-        context: ${{ inputs.context }}
-        labels: ${{ steps.meta.outputs.labels }}
-        outputs: type=image,name=${{ inputs.images }},push-by-digest=true,name-canonical=true,push=true
-        platforms: ${{ inputs.platforms }}
-        provenance: false
-    - name: Export the digest
-      if: steps.digest.outputs.digest != ''
-      shell: bash
-      env:
-        DIGEST: ${{ steps.digest.outputs.digest }}
-      run: |
-        mkdir -p "${RUNNER_TEMP}/digests"
-        touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
-    - name: Upload the digest
-      if: steps.digest.outputs.digest != ''
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        if-no-files-found: error
-        name: mcvs-docker-action-digest-${{ steps.validate.outputs.platform_slug }}
-        path: ${{ runner.temp }}/digests/*
-        retention-days: 1

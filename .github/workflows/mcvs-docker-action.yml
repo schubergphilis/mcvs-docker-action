@@ -17,9 +17,9 @@ jobs:
           context: test
           platforms: linux/amd64,linux/arm64
           push-to-container-registry: ""
-  # one job per platform, which is what the documented matrix relies on. Each
-  # job has to scan the platform that it builds, hence linux/arm64 is scanned
-  # here while the job above scans linux/amd64.
+  # the documented scan-only matrix, i.e. one job per platform so that every
+  # architecture is scanned. linux/arm64 is scanned here while the job above
+  # scans linux/amd64.
   MCVS-docker-action-per-platform:
     strategy:
       matrix:

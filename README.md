@@ -149,21 +149,15 @@ alpine`, as hadolint rejects that with
 `--platform` to Buildx, which provides `BUILDPLATFORM`, `TARGETPLATFORM`,
 `TARGETOS` and `TARGETARCH` to the build.
 
-#### Building the Architectures in Parallel
+#### Scanning Every Architecture
 
-The example above builds both architectures in one job, where `linux/arm64` is
-emulated with QEMU. To build them at the same time instead, give each platform
-its own job. GitHub runs those jobs in parallel, and each of them can pick a
-runner that matches its architecture, so no emulation is needed at all.
-
-A manifest list cannot be assembled from jobs that each push the same tag, as
-the last job would simply overwrite the others. Each job therefore pushes its
-image **by digest**, and a merge job combines the digests into one manifest
-list:
+Only one image can be loaded into the local Docker image store, so a job scans a
+single platform. To scan every architecture, run the action in a matrix with one
+platform per job, which GitHub executes in parallel:
 
 ```yaml
 jobs:
-  build:
+  scan:
     strategy:
       matrix:
         platform:
@@ -172,44 +166,24 @@ jobs:
     runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: schubergphilis/mcvs-docker-action@v0.1.0
         with:
           platforms: ${{ matrix.platform }}
-          push-by-digest: "true"
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-  merge:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: schubergphilis/mcvs-docker-action/merge@v0.1.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          push-to-container-registry: ""
 ```
 
-Each build job runs the complete pipeline for its own platform, i.e. hadolint,
-the build, Dockle, Dive and Grype. Every platform is therefore scanned in this
-shape, whereas the single job example above scans `linux/amd64` only.
+Each job runs the complete pipeline for its own platform, i.e. hadolint, the
+build, Dockle, Dive and Grype. Picking a runner that matches the architecture
+also avoids QEMU emulation entirely.
 
 Note that:
 
-- The merge job has to be gated with `if: startsWith(github.ref,
-  'refs/tags/')`, since there is nothing to merge unless the build jobs have
-  pushed. The build jobs themselves need no `if`, they run their scans on a
-  pull request and only skip the push.
-- `push-by-digest` requires exactly one platform and one image name per job, as
-  a job produces exactly one digest. The action fails with an explicit message
-  otherwise.
-- Every build job and the merge job need `packages: write` for GHCR.
-- All build jobs have to target the same `images` value, since the merge job
-  collects every digest artifact of the run.
+- This matrix does not push. `push-to-container-registry: ""` disables it,
+  because jobs that each push the same tag would overwrite one another instead of
+  producing a manifest list. Keep the ordinary single job shown above for the
+  release, which builds every platform and pushes one manifest list.
 - This is optional. The single job example above keeps working unchanged and
   needs no matrix.
 
@@ -269,7 +243,6 @@ Build and scan without pushing to any registry:
 | `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
 | `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
 | `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds. One platform is scanned per job                                                     |
-| `push-by-digest`             | No       | `false`                            | Push without a tag so a matrix of one job per platform can be merged into one manifest list by the `merge` action. Requires exactly one platform and one image name                             |
 | `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
 | `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
 | `dockerhub-token`            | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
