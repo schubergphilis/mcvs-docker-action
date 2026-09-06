@@ -51,7 +51,7 @@ runs:
     #
     # Dockerfile linting (static).
     #
-    - uses: hadolint/hadolint-action@2a66e89f53d0771bb131a7fa31f3136336094aa6 # v3.4.0
+    - uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
@@ -116,7 +116,7 @@ runs:
     #
     # Code and docker image security scanning.
     #
-    - uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+    - uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
@@ -124,7 +124,7 @@ runs:
         path: ${{ inputs.context }}
         severity-cutoff: high
     - name: Scan image using Grype
-      uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
       with:
         grype-version: ${{ inputs.grype-version }}
         image: ${{ steps.meta.outputs.tags }}
