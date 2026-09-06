@@ -34,6 +34,13 @@ inputs:
     description: |
       Docker Hub access token. Required when push-to-container-registry is set
       to 'dockerhub'.
+  platforms:
+    description: |
+      Comma separated list of target platforms to build the image for, e.g.
+      `linux/amd64,linux/arm64`. Set the value to `linux/amd64` to restore
+      single architecture builds. One platform is scanned per job, i.e.
+      `linux/amd64` when it is in the list, else the first entry.
+    default: linux/amd64,linux/arm64
   push-to-container-registry:
     description: |
       Specify the container registry to which the image must be pushed. Set the
@@ -55,6 +62,39 @@ runs:
       with:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
+    #
+    # Prepare the builder. QEMU is only required to emulate a platform that the
+    # runner does not provide natively. Buildx is always set up so that all
+    # build steps in this job share one builder and therefore one layer cache.
+    #
+    - name: Set up QEMU
+      if: inputs.platforms != 'linux/amd64'
+      uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+    #
+    # Only one image can be loaded into the docker image store, hence a single
+    # platform is picked to lint, detect waste in and scan. linux/amd64 is
+    # preferred as it requires no emulation. A consumer that wants every
+    # architecture scanned runs this action in a matrix with one platform per
+    # job, as each job then scans the platform that it builds.
+    #
+    - name: Determine the platform to scan
+      id: platform
+      shell: bash
+      env:
+        PLATFORMS: ${{ inputs.platforms }}
+      run: |
+        read -ra platforms <<< "${PLATFORMS//,/ }"
+        scan_platform="${platforms[0]}"
+        if [[ " ${platforms[*]} " == *" linux/amd64 "* ]]; then
+          scan_platform="linux/amd64"
+        fi
+        for platform in "${platforms[@]}"; do
+          [[ "$platform" == "$scan_platform" ]] ||
+            echo "::warning::platform ${platform} is built and pushed, but not scanned by Dockle, Dive and Grype"
+        done
+        echo "scan_platform=${scan_platform}" >> "$GITHUB_OUTPUT"
     #
     # Determine image name and tag.
     #
@@ -86,20 +126,28 @@ runs:
           echo "Detected single-line build-arg"
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
         fi
+    #
+    # Build, lint (dynamic), detect waste in and scan the image. Loading a non
+    # native image is fine as Dockle, Dive and Grype inspect the layers and the
+    # config, they never execute the image. steps.meta.outputs.tags is not used
+    # as the local tag since it can be multiline.
+    #
     - name: Build an image from a dockerfile
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
+        load: true
+        platforms: ${{ steps.platform.outputs.scan_platform }}
         push: false
-        tags: ${{ steps.meta.outputs.tags }}
+        tags: mcvs-docker-action:scan
     #
     # Docker image linting (dynamic).
     #
     - uses: goodwithtech/dockle-action@e30e6af832aad6ea7dca2a248d31a85eab6dbd68 # v0.4.15
       with:
-        image: ${{ steps.meta.outputs.tags }}
+        image: mcvs-docker-action:scan
         # CIS-DI-0005: Enable Content trust for Docker as this cannot be
         # achieved in public GitHub runners.
         # CIS-DI-0006: Add HEALTHCHECK instruction to the container image as
@@ -112,24 +160,25 @@ runs:
     #
     - uses: docker://wagoodman/dive:v0.13.1@sha256:f1886e6c32c094fc41a623c1989f5cb3e48aa766da5f0be233f911fc1d85ce10
       with:
-        args: ${{ steps.meta.outputs.tags }} --ci --ci-config .dive-ci
+        args: mcvs-docker-action:scan --ci --ci-config .dive-ci
+    - name: Scan the image using Grype
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+      with:
+        grype-version: ${{ inputs.grype-version }}
+        image: mcvs-docker-action:scan
+        only-fixed: false
+        output-format: table
+        severity-cutoff: high
     #
-    # Code and docker image security scanning.
+    # Code security scanning. Architecture independent, hence it runs once.
     #
-    - uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+    - name: Scan the code using Grype
+      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
       with:
         grype-version: ${{ inputs.grype-version }}
         only-fixed: false
         output-format: table
         path: ${{ inputs.context }}
-        severity-cutoff: high
-    - name: Scan image using Grype
-      uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
-      with:
-        grype-version: ${{ inputs.grype-version }}
-        image: ${{ steps.meta.outputs.tags }}
-        only-fixed: false
-        output-format: table
         severity-cutoff: high
     #
     # Log in to the container registry and push the image.
@@ -147,11 +196,26 @@ runs:
       with:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
-    - name: Push Docker image
+    #
+    # A multi architecture image cannot be stored in the local docker image
+    # store, hence the manifest list is pushed by buildx instead of by
+    # `docker push`. The layers have already been built by the steps above and
+    # are reused from the shared builder cache.
+    #
+    # provenance is disabled to prevent that buildx adds attestation manifests
+    # that are displayed as `unknown/unknown` entries in a container registry.
+    #
+    - name: Build and push the image
       if: |
         github.event_name == 'push' &&
         contains(github.ref, 'refs/tags/') &&
         inputs.push-to-container-registry != ''
-      run: |
-        docker push --all-tags ${{ inputs.images }}
-      shell: bash
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      with:
+        build-args: ${{ steps.parse.outputs.build_args }}
+        context: ${{ inputs.context }}
+        labels: ${{ steps.meta.outputs.labels }}
+        platforms: ${{ inputs.platforms }}
+        provenance: false
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
