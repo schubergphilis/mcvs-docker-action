@@ -63,12 +63,11 @@ runs:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
     #
-    # Prepare the builder. QEMU is only required to emulate a platform that the
-    # runner does not provide natively. Buildx is always set up so that all
-    # build steps in this job share one builder and therefore one layer cache.
+    # Prepare the builder. QEMU emulates the platforms that the runner does not
+    # provide natively. Buildx is always set up so that all build steps in this
+    # job share one builder and therefore one layer cache.
     #
     - name: Set up QEMU
-      if: inputs.platforms != 'linux/amd64'
       uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -85,16 +84,9 @@ runs:
       env:
         PLATFORMS: ${{ inputs.platforms }}
       run: |
-        read -ra platforms <<< "${PLATFORMS//,/ }"
-        scan_platform="${platforms[0]}"
-        if [[ " ${platforms[*]} " == *" linux/amd64 "* ]]; then
-          scan_platform="linux/amd64"
-        fi
-        for platform in "${platforms[@]}"; do
-          [[ "$platform" == "$scan_platform" ]] ||
-            echo "::warning::platform ${platform} is built and pushed, but not scanned by Dockle, Dive and Grype"
-        done
-        echo "scan_platform=${scan_platform}" >> "$GITHUB_OUTPUT"
+        scan_platform=linux/amd64
+        [[ ",$PLATFORMS," == *,linux/amd64,* ]] || scan_platform="${PLATFORMS%%,*}"
+        echo "scan_platform=$scan_platform" >> "$GITHUB_OUTPUT"
     #
     # Determine image name and tag.
     #

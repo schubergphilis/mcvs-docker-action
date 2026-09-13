@@ -134,11 +134,9 @@ releases slower. To build a single architecture instead:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Only one image can be loaded into the local Docker image store, so Dockle, Dive
-and Grype scan a single platform per job: `linux/amd64` when it is in the list,
-otherwise the first entry. A warning is emitted for every platform that is built
-but not scanned. To scan every architecture, give each one its own job as
-described below.
+Dockle, Dive and Grype scan a single platform per job: `linux/amd64` when it is
+in the list, otherwise the first entry. To scan every architecture, give each one
+its own job as described below.
 
 Additional platforms, e.g. `linux/arm/v7`, can be added to the list and are
 built and pushed like any other.

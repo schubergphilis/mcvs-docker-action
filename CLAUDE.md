@@ -16,27 +16,27 @@ MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerabili
 
 ## Action Architecture
 
-The action executes a sequential pipeline defined in `action.yml` (lines 58-220):
+The action executes a sequential pipeline defined in `action.yml`:
 
 1. **Dockerfile Linting** (hadolint) - Static analysis of Dockerfile syntax and best practices
-2. **Builder Setup** (docker/setup-qemu-action, docker/setup-buildx-action) - QEMU is only installed when `platforms != 'linux/amd64'`; buildx is always set up so all build steps share one builder and layer cache
-3. **Platform Selection** (action.yml:82-96) - Exports `scan_platform`, i.e. `linux/amd64` when it is in `platforms` and otherwise the first entry, and emits a `::warning::` for every platform that is built but not scanned
+2. **Builder Setup** (docker/setup-qemu-action, docker/setup-buildx-action) - QEMU emulates non-native platforms; buildx is always set up so all build steps share one builder and layer cache
+3. **Platform Selection** - Exports `scan_platform`, i.e. `linux/amd64` when it is in `platforms` and otherwise the first entry
 4. **Metadata Extraction** (docker/metadata-action) - Generates image tags and labels from Git context
 5. **Build Arguments Parsing** - Handles both single-line and multiline build-args inputs (uses env var for injection safety)
-6. **Build + Scan** (action.yml:135-171) - Runs once, against `steps.platform.outputs.scan_platform`:
+6. **Build + Scan** - Runs once, against `steps.platform.outputs.scan_platform`:
    - **Image Building** (docker/build-push-action) - Single-platform build with `load: true` and the fixed local tag `mcvs-docker-action:scan`
    - **Image Linting** (dockle) - Dynamic analysis of built image for CIS benchmarks
    - **Waste Detection** (dive) - Analyzes image layers for efficiency
    - **Image Scanning** (anchore/scan-action with Grype) - Scans built image for vulnerabilities
 7. **Code Scanning** (anchore/scan-action with Grype) - Scans source code context for vulnerabilities; architecture independent
 8. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
-9. **Registry Push** (action.yml:208-220) - On tag push events buildx builds every platform in `platforms` and pushes one manifest list
+9. **Registry Push** - On tag push events buildx builds every platform in `platforms` and pushes one manifest list
 
 ## Key Design Patterns
 
 ### Build Arguments Handling
 
-The action uses a special parsing step (action.yml:111-128) to support two input formats:
+The action uses a special parsing step to support two input formats:
 
 - Single-line: automatically formatted as `APPLICATION=value`
 - Multiline: passed through as-is to support multiple build arguments
@@ -62,29 +62,22 @@ so every architecture is covered without duplicating the scan block here.
   no manifest list results. The documented matrix therefore sets
   `push-to-container-registry: ""` and is a scanning aid only; the release push stays a
   single ordinary job.
-- **Why there is no digest/merge path**: an earlier revision of this branch added
-  `push-by-digest` plus a second entry point, `merge/action.yml`, so that matrix jobs
-  could be stitched into one manifest list. It was dropped because it made
-  multi-architecture support look as though it required consumers to restructure a
-  single `uses:` step into a build matrix plus a merge job. Publishing a manifest list
-  from one job costs them nothing, which is the point. Do not reintroduce it without
-  that trade-off changing.
 
 ### Security Tool Integration
 
 Three vulnerability scanners are used with different focuses:
 
-- **Grype**: Used once for image scanning (action.yml:164-171) and once for code scanning (action.yml:175-182)
-- **Dockle**: CIS Docker benchmark compliance with known ignores (action.yml:148-157)
+- **Grype**: Used once for image scanning and once for code scanning
+- **Dockle**: CIS Docker benchmark compliance with known ignores
 
 ### Conditional Push Logic
 
-Login steps are conditional on the registry selection (action.yml:186-198):
+Login steps are conditional on the registry selection:
 
 - GHCR login: runs when `push-to-container-registry == 'ghcr'`
 - Docker Hub login: runs when `push-to-container-registry == 'dockerhub'`
 
-Images are only pushed when all conditions are met (action.yml:208-212):
+Images are only pushed when all conditions are met:
 
 - Event is a push (not PR)
 - Reference contains `refs/tags/` (tagged release)
@@ -125,7 +118,7 @@ To test local changes before pushing:
 
 ### Adding a New Security Tool
 
-1. Add new step in the appropriate section of action.yml:58-220
+1. Add new step in the appropriate section of `action.yml`
 2. Consider placement in the pipeline (static analysis before build, dynamic after)
 3. Add description to README.md Features section
 4. Add configuration details to README.md Security Scanning section
@@ -140,7 +133,7 @@ To test local changes before pushing:
 
 ### Changing Push Behavior
 
-1. Modify the conditional in action.yml:209-212
+1. Modify the conditional in the `Build and push the image` step
 2. Update README.md Image Push Behavior section with new conditions
 3. Add troubleshooting entry if the change might confuse users
 4. Update CLAUDE.md Conditional Push Logic section
@@ -151,7 +144,7 @@ Dependabot is configured to update all GitHub Actions weekly in a single grouped
 
 ## Ignored Security Checks
 
-Two Dockle CIS checks are permanently ignored (action.yml:151-156):
+Two Dockle CIS checks are permanently ignored in the `dockle-action` step:
 
 - **CIS-DI-0005**: Content trust - not achievable on public GitHub runners
 - **CIS-DI-0006**: HEALTHCHECK - intentionally left to action consumers to implement
