@@ -38,8 +38,9 @@ inputs:
     description: |
       Comma separated list of target platforms to build the image for, e.g.
       `linux/amd64,linux/arm64`. Set the value to `linux/amd64` to restore
-      single architecture builds. One platform is scanned per job, i.e.
-      `linux/amd64` when it is in the list, else the first entry.
+      single architecture builds. One platform is scanned per job, i.e. the
+      platform that the runner provides natively when it is in the list, else
+      the first entry.
     default: linux/amd64,linux/arm64
   push-to-container-registry:
     description: |
@@ -63,30 +64,40 @@ runs:
         dockerfile: ${{ inputs.context }}/Dockerfile
         failure-threshold: style
     #
-    # Prepare the builder. QEMU emulates the platforms that the runner does not
-    # provide natively. Buildx is always set up so that all build steps in this
-    # job share one builder and therefore one layer cache.
-    #
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-    #
     # Only one image can be loaded into the docker image store, hence a single
-    # platform is picked to lint, detect waste in and scan. linux/amd64 is
-    # preferred as it requires no emulation. A consumer that wants every
-    # architecture scanned runs this action in a matrix with one platform per
-    # job, as each job then scans the platform that it builds.
+    # platform is picked to lint, detect waste in and scan. The platform that
+    # the runner provides natively is preferred as it requires no emulation. A
+    # consumer that wants every architecture scanned runs this action in a
+    # matrix with one platform per job, as each job then scans the platform
+    # that it builds.
     #
-    - name: Determine the platform to scan
+    - name: Determine the platforms to build and the platform to scan
       id: platform
       shell: bash
       env:
         PLATFORMS: ${{ inputs.platforms }}
       run: |
-        scan_platform=linux/amd64
-        [[ ",$PLATFORMS," == *,linux/amd64,* ]] || scan_platform="${PLATFORMS%%,*}"
-        echo "scan_platform=$scan_platform" >> "$GITHUB_OUTPUT"
+        platforms="${PLATFORMS//[[:space:]]/}"
+        native=linux/amd64
+        [[ "${RUNNER_ARCH:-}" == "ARM64" ]] && native=linux/arm64
+        scan_platform="${platforms%%,*}"
+        [[ ",$platforms," == *",$native,"* ]] && scan_platform="$native"
+        {
+          echo "platforms=$platforms"
+          echo "scan_platform=$scan_platform"
+          echo "qemu=$([[ "$platforms" == "$native" ]] && echo false || echo true)"
+        } >> "$GITHUB_OUTPUT"
+    #
+    # Prepare the builder. QEMU emulates the platforms that the runner does not
+    # provide natively, so it is skipped when the native platform is the only
+    # one that is built. Buildx is always set up so that all build steps in
+    # this job share one builder and therefore one layer cache.
+    #
+    - name: Set up QEMU
+      if: steps.platform.outputs.qemu == 'true'
+      uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
     #
     # Determine image name and tag.
     #
@@ -189,25 +200,27 @@ runs:
         username: ${{ inputs.dockerhub-username }}
         password: ${{ inputs.dockerhub-token }}
     #
+    # Every platform is built on every run, so that an architecture specific
+    # build failure surfaces on a pull request instead of on a tag. The
+    # scanned platform is a cache hit on the shared builder, hence only the
+    # remaining platforms cost time.
+    #
     # A multi architecture image cannot be stored in the local docker image
     # store, hence the manifest list is pushed by buildx instead of by
-    # `docker push`. The layers have already been built by the steps above and
-    # are reused from the shared builder cache.
+    # `docker push`. Pushing is conditional, building is not.
     #
     # provenance is disabled to prevent that buildx adds attestation manifests
     # that are displayed as `unknown/unknown` entries in a container registry.
     #
-    - name: Build and push the image
-      if: |
-        github.event_name == 'push' &&
-        contains(github.ref, 'refs/tags/') &&
-        inputs.push-to-container-registry != ''
+    - name: Build the image for every platform and push it on a tag
       uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
       with:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
-        platforms: ${{ inputs.platforms }}
+        platforms: ${{ steps.platform.outputs.platforms }}
         provenance: false
-        push: true
+        push: ${{ github.event_name == 'push' &&
+          contains(github.ref, 'refs/tags/') &&
+          inputs.push-to-container-registry != '' }}
         tags: ${{ steps.meta.outputs.tags }}

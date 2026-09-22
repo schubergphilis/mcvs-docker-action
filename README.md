@@ -124,8 +124,10 @@ No configuration is required:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-The `linux/arm64` image is built through QEMU emulation, which makes tagged
-releases slower. To build a single architecture instead:
+Every platform is built on every run, so that an architecture specific build
+failure surfaces on a pull request rather than on a tag. Only the push is
+limited to tags. The `linux/arm64` image is built through QEMU emulation, which
+makes every run slower. To build a single architecture instead:
 
 ```yaml
 - uses: schubergphilis/mcvs-docker-action@v0.1.0
@@ -134,9 +136,12 @@ releases slower. To build a single architecture instead:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-Dockle, Dive and Grype scan a single platform per job: `linux/amd64` when it is
-in the list, otherwise the first entry. To scan every architecture, give each one
-its own job as described below.
+That also skips the QEMU setup, as no emulation is needed.
+
+Dockle, Dive and Grype scan a single platform per job: the platform that the
+runner provides natively when it is in the list, otherwise the first entry. On
+an `ubuntu-24.04-arm` runner that is `linux/arm64`. To scan every architecture,
+give each one its own job as described below.
 
 Additional platforms, e.g. `linux/arm/v7`, can be added to the list and are
 built and pushed like any other.
@@ -301,7 +306,7 @@ Images are automatically pushed to the configured container registry **only when
 
 This ensures images are only published for tagged releases, keeping your registry clean and organized.
 
-A manifest list covering every platform in the `platforms` input is pushed, so consumers automatically pull the image that matches their architecture.
+A manifest list covering every platform in the `platforms` input is pushed, so consumers automatically pull the image that matches their architecture. Note that the image is *built* for every platform on every run, which is what catches an architecture specific build failure on a pull request; only the push waits for a tag.
 
 ## Required Permissions
 
