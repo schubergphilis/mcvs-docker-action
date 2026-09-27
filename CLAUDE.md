@@ -81,7 +81,7 @@ Login steps are conditional on the registry selection:
 Images are built for every platform on every run. They are only pushed when all conditions are met:
 
 - Event is a push (not PR)
-- Reference contains `refs/tags/` (tagged release)
+- Reference starts with `refs/tags/` (tagged release; `contains` would also match a branch such as `x/refs/tags/y`)
 - Input `push-to-container-registry` is not empty (supports both `ghcr` and `dockerhub`)
 
 ## Testing This Action
