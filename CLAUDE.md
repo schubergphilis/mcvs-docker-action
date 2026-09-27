@@ -73,7 +73,7 @@ Three vulnerability scanners are used with different focuses:
 
 ### Conditional Push Logic
 
-Login steps are conditional on the registry selection:
+Login steps are conditional on the registry selection and only run on a tag push, so that credentials are not exposed to runs that never push, e.g. pull requests:
 
 - GHCR login: runs when `push-to-container-registry == 'ghcr'`
 - Docker Hub login: runs when `push-to-container-registry == 'dockerhub'`

@@ -184,17 +184,23 @@ runs:
         path: ${{ inputs.context }}
         severity-cutoff: high
     #
-    # Log in to the container registry and push the image.
+    # Log in to the container registry and push the image. Logging in is
+    # skipped when the image is not pushed, so that credentials are not exposed
+    # to runs that do not need them, e.g. pull requests.
     #
     - name: Log in to GitHub Container Registry
-      if: inputs.push-to-container-registry == 'ghcr'
+      if: inputs.push-to-container-registry == 'ghcr' &&
+        github.event_name == 'push' &&
+        startsWith(github.ref, 'refs/tags/')
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ inputs.token }}
     - name: Log in to Docker Hub
-      if: inputs.push-to-container-registry == 'dockerhub'
+      if: inputs.push-to-container-registry == 'dockerhub' &&
+        github.event_name == 'push' &&
+        startsWith(github.ref, 'refs/tags/')
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
         username: ${{ inputs.dockerhub-username }}
