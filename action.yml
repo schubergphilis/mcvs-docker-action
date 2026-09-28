@@ -27,10 +27,13 @@ inputs:
       e.g.: `settings.py`. Dockle flags a hard-coded list of file names as
       suspicious (`settings.py`, `credentials`, `.env`, ...), which third-party
       packages legitimately ship. `dockle-accept-key` cannot suppress these.
+      Dockle matches on the file name only, not the path, so an accepted name
+      is accepted anywhere in the image.
   dockle-accept-file-extension:
     description: |
       Comma-separated file extensions that Dockle's CIS-DI-0010 check should
-      accept, e.g.: `pem`.
+      accept, e.g.: `pem`. Dockle matches on the extension only, not the path,
+      so an accepted extension is accepted anywhere in the image.
   grype-version:
     description: The grype version to be used by the anchore/scan-action.
   images:
