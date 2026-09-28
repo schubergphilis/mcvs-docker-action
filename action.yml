@@ -135,9 +135,12 @@ runs:
 
         if [[ "$BUILD_ARGS" == *$'\n'* ]]; then
           echo "Detected multiline build-args"
-          echo "build_args<<EOF" >> $GITHUB_OUTPUT
+          # A random delimiter prevents that a line in the input ends the
+          # heredoc early and injects other step outputs.
+          delimiter="EOF_$(openssl rand -hex 16)"
+          echo "build_args<<$delimiter" >> $GITHUB_OUTPUT
           echo "$BUILD_ARGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$delimiter" >> $GITHUB_OUTPUT
         else
           echo "Detected single-line build-arg"
           echo "build_args=APPLICATION=$BUILD_ARGS" >> $GITHUB_OUTPUT
