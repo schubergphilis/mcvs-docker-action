@@ -387,6 +387,8 @@ build-args: |
   ARG2=value2
 ```
 
+Do not pass credentials as build arguments: they are stored in the image history of the pushed image. Use a BuildKit secret mount instead.
+
 ## Contributing
 
 Contributions are welcome. Please open an issue or pull request for bugs, features, or improvements.

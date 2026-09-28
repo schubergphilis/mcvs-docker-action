@@ -130,9 +130,6 @@ runs:
       env:
         BUILD_ARGS: ${{ inputs.build-args }}
       run: |
-        echo "inputs.build-args:"
-        echo "$BUILD_ARGS"
-
         if [[ "$BUILD_ARGS" == *$'\n'* ]]; then
           echo "Detected multiline build-args"
           # A random delimiter prevents that a line in the input ends the
