@@ -21,6 +21,19 @@ inputs:
       will be installed then an error will be thrown by Dockle, which is
       incorrect. To mitigate this one has to specify the packages that are
       applicable, e.g.: `libcrypto3,libssl3`.
+  dockle-accept-file:
+    description: |
+      Comma-separated file names that Dockle's CIS-DI-0010 check should accept,
+      e.g.: `settings.py`. Dockle flags a hard-coded list of file names as
+      suspicious (`settings.py`, `credentials`, `.env`, ...), which third-party
+      packages legitimately ship. `dockle-accept-key` cannot suppress these.
+      Dockle matches on the file name only, not the path, so an accepted name
+      is accepted anywhere in the image.
+  dockle-accept-file-extension:
+    description: |
+      Comma-separated file extensions that Dockle's CIS-DI-0010 check should
+      accept, e.g.: `pem`. Dockle matches on the extension only, not the path,
+      so an accepted extension is accepted anywhere in the image.
   grype-version:
     description: The grype version to be used by the anchore/scan-action.
   images:
@@ -158,6 +171,8 @@ runs:
         # to set a health check or not.
         ignore: CIS-DI-0005,CIS-DI-0006
         accept-key: ${{ inputs.dockle-accept-key }}
+        accept-file: ${{ inputs.dockle-accept-file }}
+        accept-file-extension: ${{ inputs.dockle-accept-file-extension }}
     #
     # Detect waste in the docker image.
     #

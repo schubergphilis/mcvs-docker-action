@@ -212,6 +212,16 @@ When Dockle incorrectly flags specific package versions as secrets:
     token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+When a third-party package ships a file whose name Dockle always treats as a
+credential, e.g. `azure-core`'s `azure/core/settings.py`:
+
+```yaml
+- uses: schubergphilis/mcvs-docker-action@v0.1.0
+  with:
+    dockle-accept-file: settings.py
+    token: ${{ secrets.GITHUB_TOKEN }}
+```
+
 ### Push to Docker Hub
 
 Push images to Docker Hub instead of GHCR:
@@ -239,18 +249,20 @@ Build and scan without pushing to any registry:
 
 ## Input Parameters
 
-| Parameter                    | Required | Default                            | Description                                                                                                                                                                                     |
-| ---------------------------- | -------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `token`                      | No       | -                                  | GitHub token for pushing images to GHCR. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                                                      |
-| `build-args`                 | No       | -                                  | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
-| `context`                    | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
-| `images`                     | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
-| `platforms`                  | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds. One platform is scanned per job                                                     |
-| `push-to-container-registry` | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
-| `dockerhub-username`         | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
-| `dockerhub-token`            | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
-| `dockle-accept-key`          | No       | -                                  | Comma-separated list of package names to exclude from Dockle secret detection. Use for known false positives (see [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)) |
-| `grype-version`              | No       | latest                             | Specific version of Grype to use for vulnerability scanning                                                                                                                                     |
+| Parameter                      | Required | Default                            | Description                                                                                                                                                                                     |
+| ------------------------------ | -------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`                        | No       | -                                  | GitHub token for pushing images to GHCR. Use `${{ secrets.GITHUB_TOKEN }}`                                                                                                                      |
+| `build-args`                   | No       | -                                  | Docker build arguments. Single-line values are formatted as `APPLICATION=value`. Multiline values are passed as-is                                                                              |
+| `context`                      | No       | `.`                                | Directory containing the Dockerfile and build context                                                                                                                                           |
+| `images`                       | No       | `ghcr.io/${{ github.repository }}` | Image name(s) for tagging. Override when using Docker Hub (e.g., `my-org/my-app`)                                                                                                               |
+| `platforms`                    | No       | `linux/amd64,linux/arm64`          | Comma separated list of target platforms to build for. Set to `linux/amd64` for single architecture builds. One platform is scanned per job                                                     |
+| `push-to-container-registry`   | No       | `ghcr`                             | Registry to push to. Values: `ghcr`, `dockerhub`, or `""` to disable pushing                                                                                                                    |
+| `dockerhub-username`           | No       | -                                  | Docker Hub username. Required when `push-to-container-registry` is `dockerhub`                                                                                                                  |
+| `dockerhub-token`              | No       | -                                  | Docker Hub access token. Required when `push-to-container-registry` is `dockerhub`                                                                                                              |
+| `dockle-accept-key`            | No       | -                                  | Comma-separated list of package names to exclude from Dockle secret detection. Use for known false positives (see [goodwithtech/dockle#250](https://github.com/goodwithtech/dockle/issues/250)) |
+| `dockle-accept-file`           | No       | -                                  | Comma-separated file names to exclude from Dockle's CIS-DI-0010 suspicious-file check, e.g. `settings.py`. Matched by file name, so it is accepted anywhere in the image                        |
+| `dockle-accept-file-extension` | No       | -                                  | Comma-separated file extensions to exclude from Dockle's CIS-DI-0010 suspicious-file check, e.g. `pem`. Matched by extension, so it is accepted anywhere in the image                           |
+| `grype-version`                | No       | latest                             | Specific version of Grype to use for vulnerability scanning                                                                                                                                     |
 
 ## Security Scanning
 
