@@ -2,12 +2,16 @@
 name: MCVS-docker-action
 "on":
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
   # the default, i.e. every platform in a single job. linux/amd64 is scanned.
   MCVS-docker-action:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -21,6 +25,7 @@ jobs:
   # and the tools read an emulated image.
   MCVS-docker-action-single-platform:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,6 +38,7 @@ jobs:
   # a single, native platform, i.e. the QEMU setup is skipped.
   MCVS-docker-action-native-platform:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,6 +52,7 @@ jobs:
   # only if dockle-accept-file is forwarded to dockle-action.
   MCVS-docker-action-dockle-accept-file:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
