@@ -203,9 +203,14 @@ runs:
     # skipped when the image is not pushed, so that credentials are not exposed
     # to runs that do not need them, e.g. pull requests.
     #
+    # workflow_dispatch on a tag ref is accepted too: a tag that a workflow
+    # creates with GITHUB_TOKEN, as mcvs-general-action's auto-release does,
+    # starts no push run, but that workflow may dispatch this one on the tag.
+    #
     - name: Log in to GitHub Container Registry
       if: inputs.push-to-container-registry == 'ghcr' &&
-        github.event_name == 'push' &&
+        (github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch') &&
         startsWith(github.ref, 'refs/tags/')
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
@@ -214,7 +219,8 @@ runs:
         password: ${{ inputs.token }}
     - name: Log in to Docker Hub
       if: inputs.push-to-container-registry == 'dockerhub' &&
-        github.event_name == 'push' &&
+        (github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch') &&
         startsWith(github.ref, 'refs/tags/')
       uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
       with:
@@ -241,7 +247,8 @@ runs:
         labels: ${{ steps.meta.outputs.labels }}
         platforms: ${{ steps.platform.outputs.platforms }}
         provenance: false
-        push: ${{ github.event_name == 'push' &&
+        push: ${{ (github.event_name == 'push' ||
+          github.event_name == 'workflow_dispatch') &&
           startsWith(github.ref, 'refs/tags/') &&
           inputs.push-to-container-registry != '' }}
         tags: ${{ steps.meta.outputs.tags }}

@@ -30,7 +30,7 @@ The action executes a sequential pipeline defined in `action.yml`:
    - **Image Scanning** (anchore/scan-action with Grype) - Scans built image for vulnerabilities
 7. **Code Scanning** (anchore/scan-action with Grype) - Scans source code context for vulnerabilities; architecture independent
 8. **Registry Login** (docker/login-action) - Conditional login to GHCR or Docker Hub
-9. **Multi-Platform Build + Push** - Buildx builds every platform in `platforms` on every run and pushes one manifest list on tag push events
+9. **Multi-Platform Build + Push** - Buildx builds every platform in `platforms` on every run and pushes one manifest list when the ref is a tag and the event is a `push` or a `workflow_dispatch` (the latter for tags created with `GITHUB_TOKEN`, e.g. by auto-release, which start no push run)
 
 ## Key Design Patterns
 
