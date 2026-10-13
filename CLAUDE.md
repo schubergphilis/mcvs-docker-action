@@ -9,7 +9,8 @@ MCVS-docker-action is a GitHub composite action for Mission Critical Vulnerabili
 **Key files**:
 
 - `action.yml`: The complete action definition (inputs, steps, logic)
-- `README.md`: Comprehensive user documentation with examples
+- `README.md`: Lean entry point with a Quickstart that links to `docs/`
+- `docs/`: User documentation (features, usage examples, inputs, security scanning, image push, troubleshooting, contributing)
 - `CLAUDE.md`: This file - guidance for Claude Code
 - `.github/workflows/mcvs-pr-validation.yml`: PR validation workflow
 - `.github/dependabot.yml`: Automated dependency updates
@@ -90,7 +91,7 @@ Since this is a GitHub Action, testing means:
 
 1. Create a test workflow in `.github/workflows/` that uses the action
 2. The action can reference itself using the current branch or commit SHA
-3. Example test workflow pattern from README.md (lines 18-47)
+3. Example test workflow pattern from the README.md Quickstart
 
 To test local changes before pushing:
 
@@ -114,29 +115,29 @@ To test local changes before pushing:
 
 1. Add input definition to `action.yml` inputs section with description and optional default
 2. Use the input in the appropriate step with `${{ inputs.input-name }}`
-3. Update README.md input parameters table
-4. Add usage example to README.md if the input enables a new use case
+3. Update the input parameters table in `docs/inputs.md`
+4. Add usage example to `docs/usage-examples.md` if the input enables a new use case
 5. Update CLAUDE.md Important Inputs section if there are special considerations
 
 ### Adding a New Security Tool
 
 1. Add new step in the appropriate section of `action.yml`
 2. Consider placement in the pipeline (static analysis before build, dynamic after)
-3. Add description to README.md Features section
-4. Add configuration details to README.md Security Scanning section
+3. Add description to `docs/features.md`
+4. Add configuration details to `docs/security-scanning.md`
 5. Update CLAUDE.md Action Architecture section with step number and purpose
 
 ### Modifying Scanner Configuration
 
 1. Update the relevant step in action.yml
-2. Document the change in README.md Security Scanning section
-3. If behavior changes significantly, add to README.md Troubleshooting section
+2. Document the change in `docs/security-scanning.md`
+3. If behavior changes significantly, add to `docs/troubleshooting.md`
 4. Update CLAUDE.md if the design pattern or rationale changes
 
 ### Changing Push Behavior
 
 1. Modify the `push:` expression in the `Build the image for every platform and push it on a tag` step
-2. Update README.md Image Push Behavior section with new conditions
+2. Update `docs/image-push.md` with new conditions
 3. Add troubleshooting entry if the change might confuse users
 4. Update CLAUDE.md Conditional Push Logic section
 
@@ -157,10 +158,10 @@ The repository uses `schubergphilis/mcvs-pr-validation-action` on all PRs (`.git
 
 ## Documentation Conventions
 
-### README.md Conventions
+### README.md and docs/ Conventions
 
-- User-facing documentation with comprehensive examples
-- Should include: quick start, usage examples, input parameters table, troubleshooting
+- `README.md` stays lean: a short introduction, a `## Quickstart` and a `## Documentation` section that links every page in `docs/`
+- All other user documentation lives in `docs/`, one topic per page: features, usage examples, input parameters table, security scanning, image push behavior, troubleshooting, contributing
 - Examples should be copy-paste ready and demonstrate common use cases
 - Keep technical details balanced - enough to understand but not overwhelming
 
@@ -173,7 +174,8 @@ The repository uses `schubergphilis/mcvs-pr-validation-action` on all PRs (`.git
 
 ### Keeping Docs in Sync
 
-- When adding new inputs to action.yml, update both README.md (user table) and CLAUDE.md (technical notes if needed)
-- When changing behavior, update README.md examples and CLAUDE.md design patterns section
-- README.md is the source of truth for user documentation
+- When adding new inputs to action.yml, update both `docs/inputs.md` (user table) and CLAUDE.md (technical notes if needed)
+- When changing behavior, update `docs/usage-examples.md` and CLAUDE.md design patterns section
+- When adding a page to `docs/`, link it from the README.md Documentation section
+- README.md and `docs/` are the source of truth for user documentation
 - CLAUDE.md is the source of truth for implementation guidance
