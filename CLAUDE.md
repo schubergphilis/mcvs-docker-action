@@ -157,14 +157,14 @@ The repository uses `schubergphilis/mcvs-pr-validation-action` on all PRs (`.git
 
 ## Documentation Conventions
 
-### README.md
+### README.md Conventions
 
 - User-facing documentation with comprehensive examples
 - Should include: quick start, usage examples, input parameters table, troubleshooting
 - Examples should be copy-paste ready and demonstrate common use cases
 - Keep technical details balanced - enough to understand but not overwhelming
 
-### CLAUDE.md
+### CLAUDE.md Conventions
 
 - Technical reference for Claude Code
 - Should include: architecture details, design patterns, line number references to code
