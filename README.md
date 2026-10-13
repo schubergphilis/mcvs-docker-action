@@ -331,6 +331,10 @@ starts no `push` run, so the workflow above does not run for it. Add
 ```yaml
 "on":
   push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 ```
 
@@ -339,6 +343,7 @@ and let the workflow that created the tag dispatch it on that tag, which
 
 ```yaml
 - env:
+    GH_REPO: ${{ github.repository }}
     GH_TOKEN: ${{ github.token }}
     TAG: ${{ steps.release.outputs.tag }}
   if: steps.release.outputs.tag != ''
@@ -356,6 +361,15 @@ Your workflow needs these permissions to function correctly:
 permissions:
   contents: read # Required to checkout code
   packages: write # Required to push images to GHCR
+```
+
+The job that dispatches the workflow on a tag created by a workflow, see
+[Releasing tags created by a workflow](#releasing-tags-created-by-a-workflow),
+additionally needs:
+
+```yaml
+permissions:
+  actions: write # Required to dispatch the workflow with gh workflow run
 ```
 
 ## Troubleshooting
