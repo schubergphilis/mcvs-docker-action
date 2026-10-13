@@ -1,4 +1,3 @@
-# yamllint disable rule:line-length
 ---
 name: General
 "on":
@@ -27,6 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # yamllint disable-line rule:line-length
       - uses: schubergphilis/mcvs-general-action@96298a5c109d08a0dfd9047963e01e2441421a3f # v0.11.1
         with:
           testing-type: ${{ matrix.args.testing-type }}
