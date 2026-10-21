@@ -10,7 +10,7 @@ permissions:
 jobs:
   # the default, i.e. every platform in a single job. linux/amd64 is scanned.
   MCVS-docker-action:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,7 +24,7 @@ jobs:
   # a single, non-native platform, i.e. the scan falls back to the first entry
   # and the tools read an emulated image.
   MCVS-docker-action-single-platform:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,7 +37,7 @@ jobs:
           push-to-container-registry: ""
   # a single, native platform, i.e. the QEMU setup is skipped.
   MCVS-docker-action-native-platform:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,7 +51,7 @@ jobs:
   # an image carrying settings.py, which Dockle always flags, i.e. this passes
   # only if dockle-accept-file is forwarded to dockle-action.
   MCVS-docker-action-dockle-accept-file:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
