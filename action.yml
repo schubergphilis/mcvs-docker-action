@@ -61,6 +61,11 @@ inputs:
       value to: 'ghcr' for GitHub Container Registry, 'dockerhub' for Docker
       Hub, or '' to disable pushing to a container registry.
     default: ghcr
+  target:
+    description: |
+      Build stage of a multi-stage Dockerfile to build, scan and push, e.g.
+      `api`. Leave empty to build the last stage.
+    default: ""
   token:
     description: |
       A token is required to allow the mcvs-docker-action to push the
@@ -154,6 +159,7 @@ runs:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
+        target: ${{ inputs.target }}
         load: true
         platforms: ${{ steps.platform.outputs.scan_platform }}
         push: false
@@ -245,6 +251,7 @@ runs:
         build-args: ${{ steps.parse.outputs.build_args }}
         context: ${{ inputs.context }}
         labels: ${{ steps.meta.outputs.labels }}
+        target: ${{ inputs.target }}
         platforms: ${{ steps.platform.outputs.platforms }}
         provenance: false
         push: ${{ (github.event_name == 'push' ||
