@@ -107,6 +107,7 @@ To test local changes before pushing:
 - `platforms`: Comma separated target platforms, default `linux/amd64,linux/arm64`. Every platform is built on every run, so `linux/arm64` is emulated with QEMU on an amd64 runner and every build gets noticeably slower; consumers opt out with `platforms: linux/amd64`, which also skips the QEMU setup. Exactly one platform is scanned per job.
 - `push-to-container-registry`: Set to `ghcr` (default), `dockerhub`, or empty string `""` to disable pushing entirely.
 - `dockerhub-username` and `dockerhub-token`: Required when `push-to-container-registry` is `dockerhub`. Typically sourced from `${{ secrets.DOCKERHUB_USERNAME }}` and `${{ secrets.DOCKERHUB_TOKEN }}`.
+- `target`: Forwarded as `target:` to both `docker/build-push-action` steps, so the scanned image (`mcvs-docker-action:scan`) and the pushed image come from the same stage. Empty (default) passes no `--target`, i.e. the last stage is built as before. A consumer that builds several images from one Dockerfile runs the action in a matrix over `target` with a matching `images` per entry.
 - `token`: Required for pushing to GHCR authentication. Typically `${{ secrets.GITHUB_TOKEN }}`.
 
 ## Common Modification Patterns
